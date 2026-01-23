@@ -1,0 +1,196 @@
+{
+  "name": "Second Brain - Memory Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "slack-capture",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "id": "webhook-node"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.OPENAI_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "gpt-4o"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [{\"role\": \"system\", \"content\": \"You are a content classification assistant for a personal knowledge management system called \\\"Second Brain\\\". Your task is to analyze the user's input and return a structured JSON object with: - summary: A brief 1-2 sentence summary - category: One of [Idea, Task, Project, Reference, Journal, Meeting, Learning, Unsorted] - tags: Array of 3-5 relevant tags - sentiment: One of [positive, neutral, negative] - entities: Array of named entities, people, places, or organizations mentioned. Return only valid JSON, no additional text.\"}, {\"role\": \"user\", \"content\": $json.text }] }}"
+            },
+            {
+              "name": "response_format",
+              "value": "={{ { \"type\": \"json_object\" } }}"
+            },
+            {
+              "name": "temperature",
+              "value": 0.3
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json",
+              "keepAsSet": false
+            }
+          }
+        }
+      },
+      "name": "Classify with AI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 300],
+      "id": "classify-node"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.OPENAI_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "text-embedding-3-small"
+            },
+            {
+              "name": "input",
+              "value": "={{ $json.text }}"
+            },
+            {
+              "name": "dimensions",
+              "value": 1536
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json",
+              "keepAsSet": false
+            }
+          }
+        }
+      },
+      "name": "Generate Embedding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [650, 300],
+      "id": "embedding-node"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "memories",
+        "columns": {
+          "values": {
+            "raw_content": "={{ $json.text }}",
+            "structured_content": "={{ $('Classify with AI').item.json.content }}",
+            "category": "={{ $('Classify with AI').item.json.content.category }}",
+            "tags": "={{ JSON.stringify($('Classify with AI').item.json.tags) }}",
+            "embedding": "={{ JSON.stringify($('Generate Embedding').item.json.data[0].embedding) }}",
+            "source": "slack",
+            "slack_message_ts": "={{ $json.timestamp }}"
+          }
+        },
+        "returnAll": false,
+        "options": {}
+      },
+      "name": "Save to PostgreSQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [850, 300],
+      "id": "postgres-node"
+    },
+    {
+      "parameters": {
+        "text": "={{ 'Successfully captured: ' + $json.text + '\\nCategory: ' + $('Classify with AI').item.json.content.category + '\\nTags: ' + $('Classify with AI').item.json.content.tags.join(', ') }}",
+        "options": {}
+      },
+      "name": "Format Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [1050, 300],
+      "id": "response-node"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Classify with AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify with AI": {
+      "main": [
+        [
+          {
+            "node": "Generate Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Embedding": {
+      "main": [
+        [
+          {
+            "node": "Save to PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to PostgreSQL": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,138 @@
+version: '3.8'
+
+# Second Brain - Docker Compose Configuration
+# ============================================
+# First-time setup:
+#   1. Configure environment: cp .env.example .env
+#   2. Edit .env with your API keys
+#   3. Start services: docker-compose up -d
+#   4. Access: http://localhost:5173
+#
+# Database commands:
+#   docker-compose exec backend npm run db:status   # Check migration status
+#   docker-compose exec backend npm run db:migrate  # Run pending migrations
+#   docker-compose exec backend npm run db:setup    # First-time setup
+#   docker-compose exec backend ./scripts/setup.sh  # Run setup script
+
+services:
+  # PostgreSQL Database with pgvector
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: second-brain-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-secondbrain}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secondbrain_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-second_brain}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Initial schema setup - runs automatically on first container start
+      - ./shared/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - second-brain-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-secondbrain}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # N8N Workflow Automation
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: second-brain-n8n
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-secondbrain123}
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-second_brain}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER:-secondbrain}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD:-secondbrain_secret}
+      - GENERIC_TIMEZONE=UTC
+      - TZ=UTC
+      # Webhook URL for Slack integration
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      # Local workflows for development
+      - ./n8n:/local-n8n:ro
+    ports:
+      - "5678:5678"
+    networks:
+      - second-brain-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Backend API Server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: second-brain-backend
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      # Database connection
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-secondbrain}:${POSTGRES_PASSWORD:-secondbrain_secret}@postgres:5432/${POSTGRES_DB:-second_brain}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-second_brain}
+      - POSTGRES_USER=${POSTGRES_USER:-secondbrain}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secondbrain_secret}
+      # API Keys
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # Integration
+      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678/webhook}
+      # Security
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      # Optional: Skip database setup on startup (useful for development)
+      - SKIP_DB_SETUP=${SKIP_DB_SETUP:-false}
+    ports:
+      - "3001:3001"
+    networks:
+      - second-brain-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    # Health check handled by entrypoint script
+
+  # Frontend Web Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: second-brain-frontend
+    environment:
+      - VITE_API_URL=http://localhost:3001
+    ports:
+      - "5173:80"
+    networks:
+      - second-brain-net
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+# Named volumes for data persistence
+volumes:
+  postgres_data:
+    driver: local
+  n8n_data:
+    driver: local
+
+# Network configuration
+networks:
+  second-brain-net:
+    driver: bridge
+
+# Database management commands (see README for usage)
+# docker-compose exec backend npm run db:status   - Check migration status
+# docker-compose exec backend npm run db:migrate  - Run migrations
+# docker-compose exec backend npm run db:setup    - First-time setup

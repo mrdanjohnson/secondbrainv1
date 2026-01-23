@@ -1,0 +1,22 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy source code
+COPY src ./src
+
+# Expose debug port
+EXPOSE 3001 9229
+
+# Set environment
+ENV NODE_ENV=development
+ENV PORT=3001
+
+# Start with debug enabled
+CMD ["npm", "run", "dev"]
