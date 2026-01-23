@@ -21,10 +21,12 @@ export const chatController = {
     }
 
     // Get relevant memories for context
+    console.log('[CHAT] Searching for context with:', { message, contextLimit, threshold: 0.3 });
     const contextMemories = await vectorService.searchMemoriesByText(message, {
       limit: parseInt(contextLimit),
       threshold: 0.3
     });
+    console.log('[CHAT] Found', contextMemories.length, 'context memories');
 
     // Get conversation history
     const historyResult = await query(

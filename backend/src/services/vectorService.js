@@ -11,6 +11,9 @@ export async function createMemory(memoryData) {
     slack_message_ts
   } = memoryData;
 
+  // Convert embedding array to PostgreSQL vector format
+  const embeddingVector = embedding ? `[${embedding.join(',')}]` : null;
+
   const result = await query(
     `INSERT INTO memories 
       (raw_content, structured_content, category, tags, embedding, source, slack_message_ts)
@@ -21,7 +24,7 @@ export async function createMemory(memoryData) {
       structured_content || null,
       category || 'Unsorted',
       tags || [],
-      embedding || null,
+      embeddingVector,
       source,
       slack_message_ts || null
     ]
@@ -132,8 +135,13 @@ export async function deleteMemory(id) {
 export async function searchMemoriesByVector(queryEmbedding, options = {}) {
   const { limit = 10, category, tags, threshold = 0.5 } = options;
 
+  // Convert embedding array to PostgreSQL vector format
+  const embeddingVector = Array.isArray(queryEmbedding) 
+    ? `[${queryEmbedding.join(',')}]` 
+    : queryEmbedding;
+
   let whereConditions = ['embedding IS NOT NULL'];
-  const params = [queryEmbedding];
+  const params = [embeddingVector];
   let paramIndex = 2;
 
   if (category) {
@@ -158,17 +166,36 @@ export async function searchMemoriesByVector(queryEmbedding, options = {}) {
     [...params, limit]
   );
 
-  return result.rows
-    .filter(row => row.similarity >= threshold)
-    .map(row => ({
+  // Log similarities for debugging
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Search results:', result.rows.length, 'found');
+    if (result.rows.length > 0) {
+      console.log('Similarities:', result.rows.map(r => ({ 
+        id: r.id, 
+        similarity: parseFloat(r.similarity).toFixed(3),
+        threshold_check: parseFloat(r.similarity) >= threshold ? 'PASS' : 'FAIL',
+        content: r.raw_content?.substring(0, 50) + '...'
+      })));
+      console.log('Threshold:', threshold);
+    }
+  }
+
+  const filtered = result.rows.filter(row => row.similarity >= threshold);
+  console.log(`Filtered ${result.rows.length} to ${filtered.length} results (threshold: ${threshold})`);
+
+  return filtered.map(row => ({
       ...formatMemory(row),
       similarity: parseFloat(row.similarity)
     }));
 }
 
 export async function searchMemoriesByText(searchText, options = {}) {
+  console.log('[VECTOR] searchMemoriesByText called with:', { searchText, options });
   const embedding = await import('./aiService.js').then(m => m.generateEmbedding(searchText));
-  return searchMemoriesByVector(embedding, options);
+  console.log('[VECTOR] Generated embedding length:', embedding?.length);
+  const results = await searchMemoriesByVector(embedding, options);
+  console.log('[VECTOR] searchMemoriesByText returning:', results.length, 'results');
+  return results;
 }
 
 export async function getCategories() {

@@ -5,18 +5,20 @@ import { generateEmbedding } from '../services/aiService.js';
 export const searchController = {
   // Semantic search using vector similarity
   semanticSearch: asyncHandler(async (req, res) => {
-    const { query, limit = 10, category, tags, threshold = 0.5 } = req.body;
+    const { query, limit = 10, category, tags, threshold = 0.3 } = req.body;
 
     if (!query || typeof query !== 'string') {
       throw new ApiError(400, 'Search query is required');
     }
 
+    console.log('[SEARCH] Request:', { query, limit, category, tags, threshold });
     const results = await vectorService.searchMemoriesByText(query, {
       limit: parseInt(limit),
       category,
       tags: tags ? tags.split(',') : undefined,
       threshold: parseFloat(threshold)
     });
+    console.log('[SEARCH] Returning', results.length, 'results');
 
     res.json({
       success: true,

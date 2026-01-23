@@ -44,6 +44,7 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678/webhook}
       - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
+      - FRONTEND_URL=http://localhost:5174
     ports:
       - "3001:3001"
       - "9229:9229" # Debug port
@@ -58,9 +59,9 @@ services:
       dockerfile: Dockerfile.dev
     container_name: second-brain-frontend-dev
     environment:
-      - VITE_API_URL=http://localhost:3001
+      - VITE_API_URL=http://localhost:3001/api
     ports:
-      - "5173:5173"
+      - "5174:5173"
     volumes:
       - ./frontend:/app
       - /app/node_modules

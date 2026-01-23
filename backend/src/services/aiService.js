@@ -88,14 +88,12 @@ async function classifyWithOpenAI(content) {
         content: `You are a content classification assistant for a personal knowledge management system called "Second Brain". 
         
 Your task is to analyze the user's input and return a structured JSON object with:
-- A concise summary
-- Appropriate category
-- Relevant tags
-- Sentiment analysis
-- Priority (if applicable)
-- Named entities mentioned
-
-Categories: Idea, Task, Project, Reference, Journal, Meeting, Learning, Unsorted
+- summary: A concise summary (string)
+- category: One of [Idea, Task, Project, Reference, Journal, Meeting, Learning, Unsorted]
+- tags: Array of relevant tags (3-5 tags)
+- sentiment: One of [positive, neutral, negative]
+- priority: One of [high, medium, low] (optional)
+- entities: Array of named entities mentioned (optional)
 
 Be helpful but concise. Return only valid JSON.`
       },
@@ -104,7 +102,7 @@ Be helpful but concise. Return only valid JSON.`
         content: content
       }
     ],
-    response_format: CLASSIFICATION_SCHEMA,
+    response_format: { type: "json_object" },
     temperature: 0.3
   });
 
