@@ -11,7 +11,7 @@ This tutorial will guide you through creating an iOS Shortcut that lets you inst
 - ✅ iOS 14+ (iPhone/iPad) or macOS 12+ (Mac)
 - ✅ Shortcuts app (pre-installed on all Apple devices)
 - ✅ Second Brain server running on your network
-- ✅ Your server IP: **192.168.1.99**
+- ✅ Your server IP: **192.168.1.129**
 
 ---
 
@@ -24,10 +24,10 @@ Before creating the shortcut, you need a secure token to authenticate with your 
 Open **Safari** or any browser on your device and navigate to:
 
 ```
-http://192.168.1.99:5173
+http://192.168.1.129:5173
 ```
 
-1. Click **"Sign Up"** or **"Register"**
+1. Click **"Sign Up"** or **"Register"****
 2. Fill in the form:
    - **Name**: `Shortcuts Bot` (or your name)
    - **Email**: `shortcuts@youremail.com`
@@ -41,7 +41,7 @@ http://192.168.1.99:5173
 Open **Terminal** and run this command:
 
 ```bash
-curl -X POST http://192.168.1.99:3001/api/auth/login \
+curl -X POST http://192.168.1.129:3001/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"shortcuts@youremail.com","password":"your_password"}'
 ```
@@ -54,7 +54,7 @@ We'll create a temporary shortcut to get your token:
 2. Tap **"+"** to create a new shortcut
 3. Search for **"Get Contents of URL"** and add it
 4. Configure it:
-   - **URL**: `http://192.168.1.99:3001/api/auth/login`
+   - **URL**: `http://192.168.1.129:3001/api/auth/login`
    - **Method**: `POST`
    - Tap **"Show More"**
    - Under **Headers**, tap **"Add new field"**:
@@ -110,7 +110,7 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMjM0NSIsImlhdCI6MTY0...
 1. Search for **"Get Contents of URL"** and add it
 2. Tap the **URL field** and enter:
    ```
-   http://192.168.1.99:3001/api/memories
+   http://192.168.1.129:3001/api/memories
    ```
 
 3. Tap **"Show More"** to reveal additional options
@@ -178,7 +178,7 @@ Your request should look like this:
 2. Tap the shortcut to run it
 3. When prompted, enter: `Test memory from iOS Shortcuts`
 4. You should see: **"✅ Memory saved to Second Brain!"**
-5. Verify by opening your Second Brain web app at `http://192.168.1.99:5173`
+5. Verify by opening your Second Brain web app at `http://192.168.1.129:5173`
 
 ---
 
@@ -275,7 +275,7 @@ With "Show in Share Sheet" enabled, you can save content from any app:
 ### "Could not connect to server"
 - ✅ Check that your iPhone/iPad is on the **same WiFi network** as your Second Brain server
 - ✅ Verify server is running: `docker-compose ps`
-- ✅ Try accessing `http://192.168.1.99:3001/health` in Safari - should show `{"status":"healthy"}`
+- ✅ Try accessing `http://192.168.1.129:3001/health` in Safari - should show `{"status":"healthy"}`
 
 ### "Authentication failed" or "401 Unauthorized"
 - ✅ Your token may have expired - get a new one from Part 1, Step 2
@@ -379,7 +379,7 @@ For production use, consider:
 
 Need help? Check:
 - 📖 Main README: `README.md`
-- 🔧 API Documentation: `http://192.168.1.99:3001/api`
+- 🔧 API Documentation: `http://192.168.1.129:3001/api`
 - 💬 Backend logs: `docker-compose logs -f backend`
 
 ---

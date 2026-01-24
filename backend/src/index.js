@@ -21,7 +21,29 @@ const PORT = process.env.PORT || 3001;
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: function(origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, Postman, etc)
+    if (!origin) return callback(null, true);
+    
+    // Allow localhost and local network (192.168.x.x)
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+      process.env.FRONTEND_URL
+    ].filter(Boolean);
+    
+    // Also allow any 192.168.x.x address on port 5173
+    if (origin.match(/^http:\/\/(localhost|192\.168\.\d+\.\d+|127\.0\.0\.1):5173$/)) {
+      return callback(null, true);
+    }
+    
+    // Check against explicit allowed origins
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    }
+    
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 

@@ -1,0 +1,293 @@
+{
+  "name": "Second Brain - Direct PostgreSQL Integration",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "memory-capture",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "b8c4e4f8-0d4a-4b1c-8e5f-3a2b1c0d9e8f",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "memory-capture"
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a content classification assistant for a personal knowledge management system called \"Second Brain\".\n\nAnalyze the user's input and return a structured JSON object with:\n- summary: A brief 1-2 sentence summary\n- category: One of [Idea, Task, Project, Reference, Journal, Meeting, Learning, Unsorted]\n- tags: Array of 3-5 relevant tags (lowercase, hyphenated)\n- sentiment: One of [positive, neutral, negative]\n- priority: One of [high, medium, low] (if applicable)\n- entities: Array of named entities (people, places, organizations)\n\nReturn ONLY valid JSON, no additional text."
+            },
+            {
+              "role": "user",
+              "content": "={{ $json.body.text || $json.body.content || $json.body.event.text }}"
+            }
+          ]
+        },
+        "options": {
+          "response_format": "json_object",
+          "temperature": 0.3,
+          "maxTokens": 512
+        }
+      },
+      "id": "c9d5f5g9-1e5b-5c2d-9f6g-4b3c2d1e0f9g",
+      "name": "AI Classification",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Handle both Slack and generic webhook formats\nlet text, source, timestamp;\n\nconst body = $('Webhook').item.json.body;\n\nif (body.event) {\n  // Slack event format\n  text = body.event.text;\n  source = 'slack';\n  timestamp = body.event.ts;\n  \n  // Remove bot mention if present\n  text = text.replace(/<@[A-Z0-9]+>/g, '').trim();\n} else {\n  // Generic webhook format\n  text = body.text || body.content;\n  source = body.source || 'webhook';\n  timestamp = body.timestamp || null;\n}\n\n// Get AI classification result\nconst aiResponse = $input.item.json.message.content;\nconst classification = JSON.parse(aiResponse);\n\n// Format tags as PostgreSQL array string\nconst tagsArray = classification.tags || [];\nconst tagsFormatted = `{${tagsArray.map(t => `\"${t}\"`).join(',')}}`;\n\n// Return prepared data\nreturn [{\n  json: {\n    raw_content: text,\n    structured_content: JSON.stringify(classification),\n    category: classification.category || 'Unsorted',\n    tags: tagsFormatted,\n    source: source,\n    slack_message_ts: timestamp,\n  }\n}];"
+      },
+      "id": "d0e6g6h0-2f6c-6d3e-0g7h-5c4d3e2f1g0h",
+      "name": "Parse Classification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-3-small",
+        "input": "={{ $json.raw_content }}",
+        "options": {
+          "dimensions": 1536
+        }
+      },
+      "id": "e1f7h7i1-3g7d-7e4f-1h8i-6d5e4f3g2h1i",
+      "name": "Generate Embedding",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1,
+      "position": [850, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Get data from previous nodes\nconst preparedData = $('Parse Classification').item.json;\nconst embeddingData = $input.item.json.data[0].embedding;\n\n// Format embedding as PostgreSQL vector string\nconst embeddingFormatted = `[${embeddingData.join(',')}]`;\n\n// Combine everything for database insertion\nreturn [{\n  json: {\n    raw_content: preparedData.raw_content,\n    structured_content: preparedData.structured_content,\n    category: preparedData.category,\n    tags: preparedData.tags,\n    embedding: embeddingFormatted,\n    source: preparedData.source,\n    slack_message_ts: preparedData.slack_message_ts\n  }\n}];"
+      },
+      "id": "f2g8i8j2-4h8e-8f5g-2i9j-7e6f5g4h3i2j",
+      "name": "Prepare Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "memories",
+          "mode": "list",
+          "cachedResultName": "memories"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "raw_content": "={{ $json.raw_content }}",
+            "structured_content": "={{ $json.structured_content }}",
+            "category": "={{ $json.category }}",
+            "tags": "={{ $json.tags }}",
+            "embedding": "={{ $json.embedding }}",
+            "source": "={{ $json.source }}",
+            "slack_message_ts": "={{ $json.slack_message_ts }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "raw_content",
+              "displayName": "raw_content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "structured_content",
+              "displayName": "structured_content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tags",
+              "displayName": "tags",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "embedding",
+              "displayName": "embedding",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "slack_message_ts",
+              "displayName": "slack_message_ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "queryBatching": "independently",
+          "skipOnConflict": false
+        }
+      },
+      "id": "g3h9j9k3-5i9f-9g6h-3j0k-8f7g6h5i4j3k",
+      "name": "Insert to PostgreSQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1250, 300],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_WITH_YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "Second Brain DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": true,\n  \"message\": \"Memory captured successfully\",\n  \"id\": $json.id,\n  \"category\": $json.category,\n  \"tags\": $json.tags,\n  \"source\": $json.source\n} }}",
+        "options": {}
+      },
+      "id": "h4i0k0l4-6j0g-0h7i-4k1l-9g8h7i6j5k4l",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1450, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Classification": {
+      "main": [
+        [
+          {
+            "node": "Parse Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Classification": {
+      "main": [
+        [
+          {
+            "node": "Generate Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Embedding": {
+      "main": [
+        [
+          {
+            "node": "Prepare Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Data": {
+      "main": [
+        [
+          {
+            "node": "Insert to PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert to PostgreSQL": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-01-24T00:00:00.000Z",
+  "versionId": "1"
+}

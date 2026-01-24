@@ -14,6 +14,7 @@ services:
       - N8N_BASIC_AUTH_ACTIVE=true
       - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
       - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-secondbrain123}
+      - N8N_SECURE_COOKIE=false
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
@@ -42,7 +43,7 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678/webhook}
       - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
-      - FRONTEND_URL=http://localhost:5174
+      - FRONTEND_URL=${FRONTEND_URL:-http://192.168.1.129:5173}
     ports:
       - "3001:3001"
       - "9229:9229" # Debug port
@@ -57,9 +58,9 @@ services:
       dockerfile: Dockerfile.dev
     container_name: second-brain-frontend-dev
     environment:
-      - VITE_API_URL=http://localhost:3001/api
+      - VITE_API_URL=${VITE_API_URL:-http://192.168.1.129:3001}/api
     ports:
-      - "5174:5173"
+      - "5173:5173"
     volumes:
       - ./frontend:/app
       - /app/node_modules

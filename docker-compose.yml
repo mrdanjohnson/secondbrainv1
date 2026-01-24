@@ -26,7 +26,7 @@ services:
       # Initial schema setup - runs automatically on first container start
       - ./shared/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
-      - "5432:5432"
+      - "0.0.0.0:5432:5432"
     networks:
       - second-brain-net
     healthcheck:
@@ -47,6 +47,7 @@ services:
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
+      - N8N_SECURE_COOKIE=false
       - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-second_brain}
       - DB_POSTGRESDB_USER=${POSTGRES_USER:-secondbrain}
       - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD:-secondbrain_secret}
@@ -54,12 +55,15 @@ services:
       - TZ=UTC
       # Webhook URL for Slack integration
       - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
+      # Disable telemetry to clean up logs
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
     volumes:
       - n8n_data:/home/node/.n8n
       # Local workflows for development
       - ./n8n:/local-n8n:ro
     ports:
-      - "5678:5678"
+      - "0.0.0.0:5678:5678"
     networks:
       - second-brain-net
     depends_on:
@@ -95,7 +99,7 @@ services:
       # Ollama Configuration
       - OLLAMA_API_URL=${OLLAMA_API_URL:-http://ollama:11434}
     ports:
-      - "3001:3001"
+      - "0.0.0.0:3001:3001"
     networks:
       - second-brain-net
     depends_on:
@@ -111,7 +115,7 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     ports:
-      - "11434:11434"
+      - "0.0.0.0:11434:11434"
     networks:
       - second-brain-net
     environment:
@@ -136,12 +140,15 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: second-brain-frontend
     environment:
-      - VITE_API_URL=http://localhost:3001
+      - VITE_API_URL=${VITE_API_URL:-http://192.168.1.129:3001}
     ports:
-      - "5173:80"
+      - "0.0.0.0:5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     networks:
       - second-brain-net
     depends_on:
