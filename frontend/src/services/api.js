@@ -72,4 +72,14 @@ export const categoriesApi = {
   delete: (id) => api.delete(`/categories/${id}`)
 }
 
+// LLM Settings API
+export const llmSettingsApi = {
+  getSettings: () => api.get('/llm-settings'),
+  updateSettings: (data) => api.put('/llm-settings', data),
+  getAvailableModels: () => api.get('/llm-settings/models'),
+  getOllamaStatus: () => api.get('/llm-settings/ollama/status'),
+  pullOllamaModel: (modelName) => api.post('/llm-settings/ollama/pull', { modelName }),
+  deleteOllamaModel: (modelName) => api.delete(`/llm-settings/ollama/models/${modelName}`)
+}
+
 export default api

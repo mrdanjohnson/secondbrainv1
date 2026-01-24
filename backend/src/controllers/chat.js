@@ -1,6 +1,6 @@
 import { query } from '../db/index.js';
 import * as vectorService from '../services/vectorService.js';
-import { generateChatResponse, generateEmbedding, classifyAndStructure } from '../services/aiService.js';
+import { generateChatResponse, generateEmbedding, classifyAndStructure, getUserSettings } from '../services/aiService.js';
 import { asyncHandler, ApiError } from '../middleware/errorHandler.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -46,12 +46,12 @@ export const chatController = {
         const conversationSummary = `AI Chat Conversation\n\n${transcript}`;
 
         // Generate embedding
-        const embedding = await generateEmbedding(conversationSummary);
+        const embedding = await generateEmbedding(conversationSummary, userId);
 
         // Classify the conversation
         let structuredData;
         try {
-          structuredData = await classifyAndStructure(conversationSummary);
+          structuredData = await classifyAndStructure(conversationSummary, userId);
           // Add 'ai chat' tag
           structuredData.tags = [...new Set([...structuredData.tags, 'ai chat', 'conversation'])];
         } catch (error) {
@@ -159,12 +159,24 @@ export const chatController = {
         similarity: 1.0 // Manual selection = 100% relevant
       }));
     } else {
-      // Auto-search for relevant memories
-      console.log('[CHAT] Searching for context with:', { message, contextLimit, threshold: 0.3 });
+      // Auto-search for relevant memories using user's relevancy score setting
+      const chatSettings = await getUserSettings(userId, 'chat');
+      const threshold = chatSettings.relevancyScore || 0.3;
+      
+      console.log('[CHAT] Searching for context with:', { message, contextLimit, threshold });
       contextMemories = await vectorService.searchMemoriesByText(message, {
         limit: parseInt(contextLimit),
-        threshold: 0.3
+        threshold
       });
+      
+      // If no memories meet the threshold, get at least the 1 closest match
+      if (contextMemories.length === 0) {
+        console.log('[CHAT] No memories met threshold, fetching closest match');
+        contextMemories = await vectorService.searchMemoriesByText(message, {
+          limit: 1,
+          threshold: 0 // No threshold, get the closest match
+        });
+      }
     }
     console.log('[CHAT] Found', contextMemories.length, 'context memories');
 
@@ -190,7 +202,7 @@ export const chatController = {
     ];
 
     // Generate AI response with context
-    const response = await generateChatResponse(messages, contextMemories);
+    const response = await generateChatResponse(messages, contextMemories, userId);
 
     // Save user message
     await query(
@@ -219,6 +231,7 @@ export const chatController = {
           similarity: m.similarity
         })),
         usage: response.usage,
+        promptInfo: response.promptInfo,
         savedAsMemory: savedMemoryId ? {
           id: savedMemoryId,
           message: 'Conversation saved to your memories!'
@@ -347,7 +360,8 @@ export const chatController = {
 
     const response = await generateChatResponse(
       [{ role: 'user', content: question }],
-      contextMemories
+      contextMemories,
+      userId
     );
 
     res.json({

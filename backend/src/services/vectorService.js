@@ -12,7 +12,12 @@ export async function createMemory(memoryData) {
   } = memoryData;
 
   // Convert embedding array to PostgreSQL vector format
-  const embeddingVector = embedding ? `[${embedding.join(',')}]` : null;
+  let embeddingVector = null;
+  if (embedding) {
+    // Ensure embedding is an array (handle both array and object formats)
+    const embeddingArray = Array.isArray(embedding) ? embedding : Object.values(embedding);
+    embeddingVector = `[${embeddingArray.join(',')}]`;
+  }
 
   const result = await query(
     `INSERT INTO memories 

@@ -3,7 +3,7 @@
 ## 1. Feature Overview
 
 ### Purpose
-The AI Chat feature enables users to have intelligent conversations with their "Second Brain" by leveraging Retrieval-Augmented Generation (RAG). The system searches through stored memories using vector similarity and provides contextually relevant responses powered by either OpenAI's GPT-4 or Anthropic's Claude models.
+The AI Chat feature enables users to have intelligent conversations with their "Second Brain" by leveraging Retrieval-Augmented Generation (RAG). The system searches through stored memories using vector similarity and provides contextually relevant responses powered by user-configurable AI providers: OpenAI (GPT-4o), Anthropic (Claude Sonnet 4), or Ollama (local LLMs like llama3.2, smollm2, deepseek-r1, qwen2.5). Users can customize AI behavior through the LLM Settings page with fine-grained control over provider, model, temperature, max tokens, and relevancy scores per feature area.
 
 ### User Stories
 
@@ -13,6 +13,11 @@ The AI Chat feature enables users to have intelligent conversations with their "
 - View which memories were used to answer my questions
 - Organize conversations into sessions for different topics
 - Get quick one-off answers without creating a session
+- Delete chat sessions I no longer need
+- Select specific memories to use as context for my questions
+- View the full content of source memories used in responses
+- Save entire conversations as memories for future reference
+- See descriptive session names based on conversation content
 
 ### Key Workflows
 
@@ -20,16 +25,22 @@ The AI Chat feature enables users to have intelligent conversations with their "
 2. **Quick Questions**: Users ask single questions without creating a persistent session
 3. **Context Retrieval**: System automatically finds relevant memories and provides them as context to the AI
 4. **Session Management**: Users can view, select, and delete previous conversations
+5. **LLM Configuration**: Users configure AI provider (OpenAI/Anthropic/Ollama), model, temperature, and tokens via Settings → LLM Settings tab
 
 ### Scope
 
 **Included:**
 - Multi-turn conversational AI with memory context
 - Vector-based semantic search for relevant memories
-- Session management and history
-- Support for both OpenAI (GPT-4) and Anthropic (Claude) models
-- Source attribution (showing which memories were used)
-- Real-time message streaming interface
+- Session management and history (create, view, delete)
+- Support for OpenAI (GPT-4o), Anthropic (Claude Sonnet 4), and Ollama (local LLMs) models
+- User-configurable LLM settings per feature area (chat, search, classification, embeddings)
+- Source attribution with interactive selection and viewing
+- Manual memory selection for targeted context
+- Conversation saving to memories with auto-classification
+- Descriptive session names with timestamps and content preview
+- Auto-scrolling chat interface
+- Local LLM support via Ollama (privacy-focused, zero API cost)
 
 **Out of Scope:**
 - Voice/audio chat
@@ -72,6 +83,7 @@ The AI Chat feature enables users to have intelligent conversations with their "
 {
   "openai": "^4.47.1",           // OpenAI API client
   "@anthropic-ai/sdk": "^0.39.0", // Claude API client
+  "axios": "^1.7.9",              // HTTP client for Ollama API
   "express": "^4.19.2",           // Web framework
   "jsonwebtoken": "^9.0.2",       // Authentication
   "pg": "^8.11.5",                // PostgreSQL client
@@ -113,11 +125,14 @@ The AI Chat feature enables users to have intelligent conversations with their "
 ```
 backend/src/
 ├── controllers/
-│   └── chat.js                 # Chat endpoint handlers
+│   ├── chat.js                 # Chat endpoint handlers
+│   └── llmSettings.js          # LLM settings CRUD endpoints
 ├── routes/
-│   └── chat.js                 # Route definitions
+│   ├── chat.js                 # Chat route definitions
+│   └── llmSettings.js          # LLM settings routes
 ├── services/
-│   ├── aiService.js            # AI model integration (OpenAI/Anthropic)
+│   ├── aiService.js            # AI model integration (OpenAI/Anthropic/Ollama)
+│   ├── ollamaService.js        # Ollama local LLM integration
 │   └── vectorService.js        # Vector search operations
 ├── middleware/
 │   ├── auth.js                 # JWT authentication
@@ -130,9 +145,12 @@ backend/src/
 ```
 frontend/src/
 ├── pages/
-│   └── Chat.jsx                # Main chat interface
+│   ├── Chat.jsx                # Main chat interface
+│   └── Settings.jsx            # Settings page with LLM Settings tab
+├── components/
+│   └── LLMSettings.jsx         # LLM configuration UI
 ├── services/
-│   └── api.js                  # API client and chat endpoints
+│   └── api.js                  # API client (chat + LLM settings endpoints)
 └── context/
     └── AuthContext.jsx         # Authentication context
 ```
@@ -298,9 +316,13 @@ All chat endpoints require JWT authentication via `Authorization: Bearer <token>
 {
   "message": "How do I use useEffect?",
   "sessionId": "session-uuid",    // Optional, will create new if missing
-  "contextLimit": 5               // Optional, default: 5
+  "contextLimit": 5,              // Optional, default: 5
+  "specificMemoryIds": ["uuid1", "uuid2"]  // Optional, use specific memories
 }
 ```
+
+**Special Commands:**
+- "remember this conversation" / "save this conversation" - Saves the entire conversation as a memory with auto-classification and 'ai chat' tag
 
 **Response:**
 ```json
@@ -392,6 +414,39 @@ All chat endpoints require JWT authentication via `Authorization: Bearer <token>
 
 ---
 
+### Table: `user_llm_settings`
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `id` | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Settings identifier |
+| `user_id` | UUID | FOREIGN KEY → users(id), ON DELETE CASCADE, UNIQUE | Settings owner |
+| `chat_provider` | VARCHAR(20) | DEFAULT 'openai' | AI provider for chat (openai/anthropic/ollama) |
+| `chat_model` | VARCHAR(100) | DEFAULT 'gpt-4o' | Model name for chat |
+| `chat_temperature` | DECIMAL(3,2) | DEFAULT 0.7 | Temperature for chat (0-2) |
+| `chat_max_tokens` | INTEGER | DEFAULT 2048 | Max tokens for chat responses |
+| `chat_relevancy_score` | DECIMAL(3,2) | DEFAULT 0.3 | Min similarity for chat context (0-1) |
+| `search_provider` | VARCHAR(20) | DEFAULT 'openai' | AI provider for search |
+| `search_model` | VARCHAR(100) | DEFAULT 'gpt-4o' | Model name for search |
+| `search_temperature` | DECIMAL(3,2) | DEFAULT 0.3 | Temperature for search |
+| `search_max_tokens` | INTEGER | DEFAULT 1024 | Max tokens for search |
+| `search_relevancy_score` | DECIMAL(3,2) | DEFAULT 0.5 | Min similarity for search context |
+| `classification_provider` | VARCHAR(20) | DEFAULT 'openai' | AI provider for classification |
+| `classification_model` | VARCHAR(100) | DEFAULT 'gpt-4o' | Model name for classification |
+| `classification_temperature` | DECIMAL(3,2) | DEFAULT 0.3 | Temperature for classification |
+| `classification_max_tokens` | INTEGER | DEFAULT 512 | Max tokens for classification |
+| `embedding_provider` | VARCHAR(20) | DEFAULT 'openai' | AI provider for embeddings |
+| `embedding_model` | VARCHAR(100) | DEFAULT 'text-embedding-3-small' | Model for embeddings |
+| `created_at` | TIMESTAMP WITH TIME ZONE | DEFAULT NOW() | Settings creation time |
+| `updated_at` | TIMESTAMP WITH TIME ZONE | DEFAULT NOW() | Last update time |
+
+**Indexes:**
+- `idx_user_llm_settings_user` on `user_id`
+
+**Triggers:**
+- `update_user_llm_settings_updated_at` - Auto-updates `updated_at` on row update
+
+---
+
 ### Table: `memories` (Referenced)
 
 The chat system queries the `memories` table for context retrieval:
@@ -416,17 +471,30 @@ Chat.jsx (Page)
 │   ├── New Chat Button
 │   └── Session List
 │       └── Session Item
-│           ├── Session Title
+│           ├── Session Title ("Chat - date/time")
+│           ├── Subtitle (first 5 words of conversation)
 │           ├── Message Count
-│           └── Delete Button
+│           └── Delete Button (hover to show)
 └── Chat Area
     ├── Empty State (when no session selected)
-    ├── Messages List
+    ├── Messages List (with auto-scroll)
     │   └── Message Bubble
     │       ├── Avatar (User/Bot)
     │       ├── Content
-    │       └── Context Sources (optional)
+    │       └── Context Sources
+    │           ├── View Source Button
+    │           ├── Source Modal (popup)
+    │           │   ├── Full Content
+    │           │   ├── Category
+    │           │   ├── Tags
+    │           │   └── Similarity Score
+    │           └── Source Selection (checkboxes)
+    ├── Notification Banner (conversation saved)
     └── Message Input
+        ├── Memory Selector Dropdown
+        │   ├── Category Filter
+        │   ├── Memory Checkboxes
+        │   └── Selected Memory Chips
         ├── Text Input
         └── Send Button
 ```
@@ -436,13 +504,27 @@ Chat.jsx (Page)
 #### Chat.jsx (Main Component)
 **Location**: [frontend/src/pages/Chat.jsx](../frontend/src/pages/Chat.jsx)
 
-**Purpose**: Primary chat interface with session management and messaging
+**Purpose**: Primary chat interface with session management, messaging, and advanced context control
+
+**New Features Implemented:**
+1. **Session Deletion**: Hover-triggered delete button with confirmation dialog
+2. **Interactive Source Selection**: Checkboxes to select/deselect context sources
+3. **Source Viewing**: Modal popup to view full memory content with metadata
+4. **Memory Selector**: Dropdown to manually select specific memories for context
+5. **Smart Session Names**: "Chat - Jan 23, 10:30 AM" + first 5 words of conversation
+6. **Auto-scroll**: Automatically scrolls to latest message on send/receive
+7. **Conversation Saving**: "Remember this conversation" command saves chat as memory
 
 **State:**
 ```javascript
 const [selectedSession, setSelectedSession] = useState(null)
 const [message, setMessage] = useState('')
 const [sessions, setSessions] = useState([])
+const [selectedSources, setSelectedSources] = useState([])
+const [viewingSource, setViewingSource] = useState(null)
+const [showMemorySelector, setShowMemorySelector] = useState(false)
+const [selectedMemories, setSelectedMemories] = useState([])
+const [savedMemoryNotification, setSavedMemoryNotification] = useState(null)
 ```
 
 **Key Queries:**
@@ -450,9 +532,10 @@ const [sessions, setSessions] = useState([])
 - `chatMessages`: Fetches messages for selected session
 
 **Key Mutations:**
-- `sendMessageMutation`: Sends a message to the API
+- `sendMessageMutation`: Sends a message to the API (with optional specificMemoryIds)
 - `createSessionMutation`: Creates a new chat session
-- `deleteSessionMutation`: Deletes a session
+- `deleteSessionMutation`: Deletes a session (with confirmation dialog)
+- Auto-scroll on message send/receive using messagesEndRef
 
 ### State Management
 
@@ -527,41 +610,48 @@ async sendMessage(req, res)
 **Purpose**: Handles incoming chat messages, retrieves context, generates AI response
 
 **Flow:**
-1. Extract message, sessionId, contextLimit from request
+1. Extract message, sessionId, contextLimit, specificMemoryIds from request
 2. Create new session if sessionId not provided
-3. Search for relevant memories using vector similarity
-4. Retrieve conversation history (last 20 messages)
-5. Build message array with history and new message
-6. Generate AI response with context
-7. Save both user message and assistant response to database
-8. Return response with context information
+3. **Check for conversation save command** ("remember this conversation")
+   - If detected, save entire conversation as memory with auto-classification
+   - Return canned response with category and tags info
+   - Skip AI generation
+4. Search for relevant memories using vector similarity OR use specificMemoryIds
+5. Retrieve conversation history (last 20 messages)
+6. Build message array with history and new message
+7. Generate AI response with context
+8. Save both user message and assistant response to database
+9. Return response with context information
 
 **Parameters:**
 - `message` (string, required): User's message text
 - `sessionId` (UUID, optional): Existing session ID or creates new
 - `contextLimit` (number, optional, default: 5): Max memories to retrieve
+- `specificMemoryIds` (array of UUIDs, optional): Use specific memories instead of vector search
 
 ---
 
 #### `generateChatResponse()`
-**Location**: [backend/src/services/aiService.js](../backend/src/services/aiService.js#L133)
+**Location**: [backend/src/services/aiService.js](../backend/src/services/aiService.js#L272)
 
 **Signature:**
 ```javascript
-async generateChatResponse(messages, context = [])
+export async function generateChatResponse(messages, context = [], userId = null)
 ```
 
-**Purpose**: Generates AI response using OpenAI or Anthropic models with memory context
+**Purpose**: Generates AI response using user-configured AI provider (OpenAI/Anthropic/Ollama) with memory context
 
 **Flow:**
-1. Check AI_PROVIDER environment variable (default: 'openai')
-2. Build system prompt with context memories
-3. Call appropriate AI service (OpenAI or Anthropic)
-4. Return response content and token usage
+1. Get user's LLM settings from database (or use defaults if userId is null)
+2. Select AI provider based on user settings (openai/anthropic/ollama)
+3. Build system prompt with context memories
+4. Call appropriate AI service with user-configured temperature and max_tokens
+5. Return response content and token usage
 
 **Parameters:**
 - `messages` (Array): Chat history with {role, content} objects
 - `context` (Array): Relevant memories for context augmentation
+- `userId` (UUID, optional): User ID to fetch personalized LLM settings
 
 **Returns:**
 ```javascript
@@ -807,7 +897,19 @@ Here are some relevant memories from the user's Second Brain:
 - **Endpoints**:
   - `POST /v1/messages` - Generate responses
 - **Models**: `claude-sonnet-4-20250514`
-- **Configuration**: Enabled via `AI_PROVIDER=anthropic` env var
+- **Configuration**: Set via user LLM settings (Settings → LLM Settings)
+
+**3. Ollama API**
+- **Purpose**: Local LLM integration for privacy and zero-cost AI
+- **Endpoints**:
+  - `GET /api/tags` - List downloaded models
+  - `POST /api/chat` - Generate chat responses
+  - `POST /api/embeddings` - Generate embeddings
+  - `POST /api/pull` - Download models
+  - `DELETE /api/delete` - Remove models
+- **Models**: llama3.2, llama3.2:3b, llama3.1:8b, smollm2:1.7b, deepseek-r1:1.5b, qwen2.5:0.5b, mistral, mixtral:8x7b, nomic-embed-text, mxbai-embed-large, phi3
+- **Configuration**: Docker service running on port 11434, configurable per user
+- **Benefits**: 100% local processing, no API costs, complete data privacy
 
 ---
 
@@ -821,10 +923,7 @@ Here are some relevant memories from the user's Second Brain:
 # Database Connection
 DATABASE_URL=postgresql://user:password@localhost:5432/second_brain
 
-# AI Provider (openai or anthropic)
-AI_PROVIDER=openai
-
-# OpenAI Configuration
+# OpenAI Configuration (required for embeddings, optional for chat)
 OPENAI_API_KEY=sk-...
 
 # JWT Authentication
@@ -834,8 +933,11 @@ JWT_SECRET=your-super-secret-key
 **Optional:**
 
 ```env
-# Anthropic (if using Claude)
+# Anthropic (if using Claude for chat)
 ANTHROPIC_API_KEY=sk-ant-...
+
+# Ollama (local LLM support)
+OLLAMA_API_URL=http://localhost:11434  # Default: http://localhost:11434
 
 # Server Configuration
 PORT=3001
@@ -846,6 +948,8 @@ POSTGRES_USER=secondbrain
 POSTGRES_PASSWORD=your_password
 POSTGRES_DB=second_brain
 ```
+
+**Note:** With the new LLM Settings feature, users can configure their AI provider per feature area (chat, search, classification, embeddings) through the UI. The system defaults to OpenAI but users can switch to Anthropic or Ollama without code changes.
 
 ### Feature Flags
 
@@ -861,16 +965,50 @@ Currently no feature flags implemented. Potential additions:
 const DEFAULT_CONTEXT_LIMIT = 5;
 const MAX_HISTORY_MESSAGES = 20;
 const SIMILARITY_THRESHOLD = 0.3;
+
+// Conversation save detection regex
+const REMEMBER_PATTERN = /remember this conversation|save this conversation|save our chat|remember our conversation/i;
+```
+
+**In Chat.jsx:**
+```javascript
+const AUTO_SCROLL_DELAY = 100; // ms delay before scrolling
+const SESSION_TITLE_WORD_LIMIT = 5; // words in subtitle
+const NOTIFICATION_DURATION = 3000; // ms to show notification
 ```
 
 **In AI service:**
 ```javascript
-const EMBEDDING_MODEL = 'text-embedding-3-small';
-const CHAT_MODEL = 'gpt-4o';
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
-const MAX_EMBEDDING_LENGTH = 8000; // characters
-const TEMPERATURE = 0.7;
-const MAX_TOKENS = 2048;
+// Default settings (used when user has no custom settings)
+const DEFAULT_SETTINGS = {
+  chat: {
+    provider: 'openai',
+    model: 'gpt-4o',
+    temperature: 0.7,
+    maxTokens: 2048
+  },
+  search: {
+    provider: 'openai',
+    model: 'gpt-4o',
+    temperature: 0.3,
+    maxTokens: 1024
+  },
+  classification: {
+    provider: 'openai',
+    model: 'gpt-4o',
+    temperature: 0.3,
+    maxTokens: 512
+  },
+  embedding: {
+    provider: 'openai',
+    model: 'text-embedding-3-small'
+  }
+};
+
+// Available models
+const OPENAI_CHAT_MODELS = ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'];
+const ANTHROPIC_MODELS = ['claude-sonnet-4-20250514'];
+const OLLAMA_RECOMMENDED = ['llama3.2', 'llama3.2:3b', 'llama3.1:8b', 'smollm2:1.7b', 'deepseek-r1:1.5b', 'qwen2.5:0.5b', 'mistral', 'mixtral:8x7b'];
 ```
 
 ---
@@ -1011,10 +1149,9 @@ npm test -- --watch
    - **Priority**: Medium
    - **Effort**: High (requires SSE or WebSocket implementation)
 
-3. **Session Title Not Auto-Generated**
-   - Sessions created with generic titles or null
-   - **Priority**: Low
-   - **Effort**: Low (use first message as title)
+3. ~~**Session Title Not Auto-Generated**~~ ✅ **RESOLVED**
+   - Sessions now show "Chat - [timestamp]" + first 5 words of conversation
+   - Implemented in Chat.jsx with `formatDateTime()` and `truncateToWords()`
 
 4. **No Message Editing/Deletion**
    - Once sent, messages cannot be modified
@@ -1224,6 +1361,15 @@ console.log('[DEBUG] AI response:', response);
 
 ## 14. Future Enhancements
 
+### Completed Features ✅
+
+1. **User-Configurable LLM Settings** (Completed Jan 23, 2026)
+   - Users can select AI provider (OpenAI/Anthropic/Ollama) per feature area
+   - Fine-tune temperature, max tokens, and relevancy scores
+   - Ollama integration for local LLM support
+   - Per-user settings stored in database
+   - UI in Settings → LLM Settings tab
+
 ### Planned Features
 
 1. **Message Streaming** ⭐ Priority
@@ -1231,25 +1377,25 @@ console.log('[DEBUG] AI response:', response);
    - Show AI response as it's generated
    - Estimated effort: 2-3 days
 
-2. **Session Titles Auto-Generation**
-   - Use first message to generate session title via AI
-   - Update title after first exchange
-   - Estimated effort: 4 hours
-
-3. **Message Reactions**
+2. **Message Reactions**
    - Allow users to 👍/👎 messages
    - Use feedback for prompt tuning
    - Estimated effort: 1 day
 
-4. **Export Chat History**
+3. **Export Chat History**
    - Export sessions as Markdown or PDF
    - Include context sources
    - Estimated effort: 1 day
 
-5. **Voice Input**
+4. **Voice Input**
    - Use browser Web Speech API
    - Convert speech to text for messaging
    - Estimated effort: 2 days
+
+5. **Conversation Forking**
+   - Create new conversation branches from any message
+   - Explore different conversation paths
+   - Estimated effort: 2-3 days
 
 ### Potential Improvements
 
@@ -1272,6 +1418,10 @@ console.log('[DEBUG] AI response:', response);
 - AI model selection in UI (GPT-4 vs Claude)
 - Custom system prompts per session
 - Pin important messages
+- Search within conversation history
+- Multi-conversation memory sharing
+- Conversation templates (Q&A, brainstorming, etc.)
+- Context usage analytics (which memories are used most)
 
 **Developer Experience:**
 - Add API documentation with Swagger/OpenAPI
@@ -1322,6 +1472,11 @@ console.log('[DEBUG] AI response:', response);
 
 ---
 
-**Document Version**: 1.0  
+**Document Version**: 1.1  
 **Last Updated**: January 23, 2026  
 **Maintained By**: Development Team
+
+**Changelog:**
+- v1.2 (Jan 23, 2026): Added user-configurable LLM settings, Ollama local LLM support, user_llm_settings table, llmSettings controller/routes, LLMSettings UI component, and 8 recommended Ollama models (including ultra-lightweight options: smollm2:1.7b, deepseek-r1:1.5b, qwen2.5:0.5b)
+- v1.1 (Jan 23, 2026): Added documentation for session deletion, source selection, memory selector, conversation saving, smart session names, and auto-scroll features
+- v1.0 (Jan 23, 2026): Initial comprehensive documentation

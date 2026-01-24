@@ -1,22 +1,32 @@
 import * as vectorService from '../services/vectorService.js';
 import { asyncHandler, ApiError } from '../middleware/errorHandler.js';
-import { generateEmbedding } from '../services/aiService.js';
+import { generateEmbedding, getUserSettings } from '../services/aiService.js';
 
 export const searchController = {
   // Semantic search using vector similarity
   semanticSearch: asyncHandler(async (req, res) => {
-    const { query, limit = 10, category, tags, threshold = 0.3 } = req.body;
+    const { query, limit = 10, category, tags, threshold } = req.body;
+    const userId = req.user.id;
 
     if (!query || typeof query !== 'string') {
       throw new ApiError(400, 'Search query is required');
     }
 
-    console.log('[SEARCH] Request:', { query, limit, category, tags, threshold });
+    // Get user's search relevancy score setting if threshold not explicitly provided
+    let finalThreshold = threshold;
+    if (finalThreshold === undefined) {
+      const searchSettings = await getUserSettings(userId, 'search');
+      finalThreshold = searchSettings.relevancyScore || 0.5;
+    } else {
+      finalThreshold = parseFloat(threshold);
+    }
+
+    console.log('[SEARCH] Request:', { query, limit, category, tags, threshold: finalThreshold });
     const results = await vectorService.searchMemoriesByText(query, {
       limit: parseInt(limit),
       category,
       tags: tags ? tags.split(',') : undefined,
-      threshold: parseFloat(threshold)
+      threshold: finalThreshold
     });
     console.log('[SEARCH] Returning', results.length, 'results');
 

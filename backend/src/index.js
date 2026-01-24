@@ -13,6 +13,7 @@ import chatRoutes from './routes/chat.js';
 import authRoutes from './routes/auth.js';
 import categoryRoutes from './routes/categories.js';
 import webhookRoutes from './routes/webhook.js';
+import llmSettingsRoutes from './routes/llmSettings.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -58,6 +59,7 @@ app.use('/api/memories', apiLimiter, authMiddleware, memoryRoutes);
 app.use('/api/search', apiLimiter, authMiddleware, searchRoutes);
 app.use('/api/chat', apiLimiter, authMiddleware, chatRoutes);
 app.use('/api/categories', apiLimiter, authMiddleware, categoryRoutes);
+app.use('/api/llm-settings', apiLimiter, authMiddleware, llmSettingsRoutes);
 
 // 404 handler
 app.use((req, res) => {

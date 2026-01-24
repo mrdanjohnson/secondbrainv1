@@ -92,6 +92,8 @@ services:
       - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
       # Optional: Skip database setup on startup (useful for development)
       - SKIP_DB_SETUP=${SKIP_DB_SETUP:-false}
+      # Ollama Configuration
+      - OLLAMA_API_URL=${OLLAMA_API_URL:-http://ollama:11434}
     ports:
       - "3001:3001"
     networks:
@@ -101,6 +103,34 @@ services:
         condition: service_healthy
     restart: unless-stopped
     # Health check handled by entrypoint script
+
+  # Ollama Local LLM Server
+  ollama:
+    image: ollama/ollama:latest
+    container_name: second-brain-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - second-brain-net
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    # For GPU support, uncomment:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
 
   # Frontend Web Application
   frontend:
@@ -123,6 +153,8 @@ volumes:
   postgres_data:
     driver: local
   n8n_data:
+    driver: local
+  ollama_data:
     driver: local
 
 # Network configuration

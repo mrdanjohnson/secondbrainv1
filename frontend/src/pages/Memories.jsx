@@ -84,7 +84,7 @@ export default function Memories() {
               className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
             >
               <option value="">All categories</option>
-              {categories?.map((cat) => (
+              {Array.isArray(categories) && categories.map((cat) => (
                 <option key={cat.id} value={cat.name}>{cat.name}</option>
               ))}
             </select>

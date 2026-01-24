@@ -19,8 +19,7 @@ export default function Chat() {
   // Load sessions
   const { data: sessionsData, isLoading: sessionsLoading } = useQuery({
     queryKey: ['chatSessions'],
-    queryFn: () => chatApi.getSessions().then(res => res.data.data),
-    refetchInterval: 10000
+    queryFn: () => chatApi.getSessions().then(res => res.data.data)
   })
 
   // Load categories for memory selector
@@ -54,6 +53,24 @@ export default function Chat() {
       queryClient.invalidateQueries(['chatSessions'])
       queryClient.invalidateQueries(['chatMessages', selectedSession?.id])
       setMessage('')
+      
+      // Log prompt info to browser console
+      if (response.data.data.promptInfo) {
+        const info = response.data.data.promptInfo;
+        console.log(`\n========== ${info.provider.toUpperCase()} PROMPT ==========`);
+        console.log('Model:', info.model);
+        console.log('Temperature:', info.temperature);
+        console.log('Max Tokens:', info.maxTokens);
+        console.log('Context Memories:', info.contextCount);
+        if (info.systemPrompt) {
+          console.log('\nSystem Prompt:', info.systemPrompt);
+        }
+        console.log('\nMessages:');
+        info.messages?.forEach((msg, idx) => {
+          console.log(`[${idx}] ${msg.role.toUpperCase()}:`, msg.content);
+        });
+        console.log('===================================\n');
+      }
       
       // Check if conversation was saved as memory
       if (response.data.data.savedAsMemory) {

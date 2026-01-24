@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { User, Lock, Bell, Palette, Database, Trash2, AlertTriangle } from 'lucide-react'
+import { User, Lock, Bell, Palette, Database, Trash2, AlertTriangle, Cpu } from 'lucide-react'
+import LLMSettings from '../components/LLMSettings'
 
 export default function Settings() {
   const { user, updateProfile } = useAuth()
@@ -36,6 +37,7 @@ export default function Settings() {
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'security', label: 'Security', icon: Lock },
+    { id: 'llm', label: 'LLM Settings', icon: Cpu },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'appearance', label: 'Appearance', icon: Palette },
     { id: 'data', label: 'Data', icon: Database }
@@ -166,6 +168,8 @@ export default function Settings() {
               </button>
             </div>
           )}
+
+          {activeTab === 'llm' && <LLMSettings />}
 
           {activeTab === 'notifications' && (
             <div className="space-y-4">

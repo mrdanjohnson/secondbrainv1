@@ -25,22 +25,22 @@ export async function query(text, params) {
   const result = await pool.query(text, params);
   const duration = Date.now() - start;
   
-  if (process.env.NODE_ENV === 'development') {
-    // Truncate large params (like embeddings) for cleaner logs
-    const truncatedParams = params?.map(param => {
-      if (typeof param === 'string' && param.startsWith('[') && param.length > 100) {
-        return param.substring(0, 20) + '...' + param.substring(param.length - 5);
-      }
-      return param;
-    });
-    
-    console.log('Executed query', { 
-      text: text.substring(0, 100), 
-      duration, 
-      rows: result.rowCount,
-      ...(truncatedParams && truncatedParams.length > 0 ? { params: truncatedParams } : {})
-    });
-  }
+  // Query logging disabled - enable if needed for debugging
+  // if (process.env.NODE_ENV === 'development') {
+  //   const truncatedParams = params?.map(param => {
+  //     if (typeof param === 'string' && param.startsWith('[') && param.length > 100) {
+  //       return param.substring(0, 20) + '...' + param.substring(param.length - 5);
+  //     }
+  //     return param;
+  //   });
+  //   
+  //   console.log('Executed query', { 
+  //     text: text.substring(0, 100), 
+  //     duration, 
+  //     rows: result.rowCount,
+  //     ...(truncatedParams && truncatedParams.length > 0 ? { params: truncatedParams } : {})
+  //   });
+  // }
   
   return result;
 }

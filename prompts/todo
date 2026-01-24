@@ -1,7 +1,10 @@
-I would like to add a llm tab to the Settings page.
+I have a few features to add.
+
+1. Add Ollama to the docker-compose, shareing the same network as the others. Also create a way to indicate which models are available / downloaded into ollama. *Flesh out this feature for me.
+2. Add a llm tab to the Settings page.
 I would like these features;
-Pick from LLM's available. (claude, openai, ollama (local))
-Pick from Models for those llms
-Max tokens
-Tempreture
-Relevancy score setting of ai chat and search
+- Pick which llm to use from the LLM's available. (claude, openai, ollama(local)) -for each area of the app
+- Pick from available Models for those llms -for each area of the app
+- Add sliders for Max tokens -for each area of the app (with recommended tempretures for each area)
+- Tempreture -for each area of the app (with recommended tempretures for each area)
+- Add Relevancy score setting for ai chat and search

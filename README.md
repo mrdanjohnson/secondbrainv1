@@ -8,6 +8,8 @@ A powerful, AI-powered knowledge management system that automatically captures, 
 - **AI Classification**: Automatic categorization and tagging using GPT-4/Claude
 - **Vector Search**: Semantic search that understands meaning, not just keywords
 - **RAG Chat**: Chat with your Second Brain to retrieve and connect knowledge
+- **🆕 LLM Settings**: Choose AI providers (OpenAI, Claude, Ollama) per feature
+- **🆕 Local LLMs**: Run AI models locally with Ollama for privacy and cost savings
 - **Modern UI**: Beautiful React frontend with dark mode support
 - **Self-Hosted**: Full Docker deployment for complete control
 
@@ -48,11 +50,16 @@ N8N_PASSWORD=your_secure_n8n_password
 
 # AI API Keys
 OPENAI_API_KEY=sk-your-openai-key
-ANTHROPIC_API_KEY=your-anthropic-key
+ANTHROPIC_API_KEY=your-anthropic-key  # Optional: for Claude support
 
 # Security
 JWT_SECRET=your-super-secret-jwt-key
+
+# Optional: Ollama (for local LLMs)
+OLLAMA_API_URL=http://ollama:11434  # Default in Docker
 ```
+
+**🆕 New in v2.0**: You can now run AI models locally using Ollama! This eliminates API costs and keeps your data completely private. See [LLM Settings Guide](#llm-settings--local-ai) below.
 
 ### 3. Start Services
 
@@ -168,6 +175,60 @@ curl -X POST http://localhost:3001/api/search/semantic \
   -H "Content-Type: application/json" \
   -d '{"query": "What are the applications of AI in business?", "limit": 10}'
 ```
+
+## LLM Settings & Local AI
+
+**🆕 New Feature**: Configure AI providers and run models locally!
+
+### Overview
+
+Second Brain now supports multiple AI providers and local model execution:
+- **OpenAI** - GPT-4, GPT-4o Mini, GPT-3.5 Turbo
+- **Anthropic** - Claude Sonnet 4, Claude 3.5, Claude 3 Opus
+- **Ollama** - Run LLMs locally (llama3.2, mistral, mixtral, etc.)
+
+### Quick Start with Ollama
+
+1. **Run the database migration**:
+```bash
+docker-compose exec backend npm run db:migrate
+```
+
+2. **Start Ollama service**:
+```bash
+docker-compose up -d ollama
+```
+
+3. **Pull a model**:
+```bash
+docker exec -it second-brain-ollama ollama pull llama3.2
+```
+
+4. **Configure in UI**:
+   - Navigate to Settings → LLM Settings
+   - Select provider and model for each feature area
+   - Adjust temperature and token limits
+   - Save settings
+
+### Configuration Areas
+
+You can configure different AI providers for each app feature:
+
+| Feature | Purpose | Recommended Temperature |
+|---------|---------|------------------------|
+| **AI Chat** | Conversational interactions | 0.7 (balanced) |
+| **Search** | Finding relevant memories | 0.3 (focused) |
+| **Classification** | Auto-categorization | 0.3 (consistent) |
+| **Embeddings** | Vector generation | N/A |
+
+### Why Use Ollama?
+
+✅ **100% Privacy** - No data sent to external APIs  
+✅ **Zero API Costs** - Run unlimited queries for free  
+✅ **Offline Capable** - Works without internet  
+✅ **Full Control** - Choose and customize any model  
+
+📖 **Full Documentation**: [`docs/LLM-SETTINGS-QUICKSTART.md`](./docs/LLM-SETTINGS-QUICKSTART.md)
 
 ## Development
 
