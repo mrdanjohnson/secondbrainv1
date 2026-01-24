@@ -1,0 +1,453 @@
+# Architecture Decision Records (ADRs) - Second Brain
+
+## Overview
+
+This document records key architectural decisions made during Second Brain development, including context, alternatives considered, and rationale.
+
+---
+
+## ADR Template
+
+```markdown
+# ADR-XXX: [Title]
+
+**Date**: YYYY-MM-DD  
+**Status**: [Proposed | Accepted | Deprecated | Superseded]  
+**Deciders**: [Who made the decision]
+
+## Context
+[What is the issue we're trying to solve?]
+
+## Decision
+[What is the change we're making?]
+
+## Alternatives Considered
+[What other options did we evaluate?]
+
+## Consequences
+**Positive**:
+- [Benefit 1]
+- [Benefit 2]
+
+**Negative**:
+- [Trade-off 1]
+- [Trade-off 2]
+
+## Implementation Notes
+[How to implement this decision]
+```
+
+---
+
+## ADR-001: Separate Frontend and Backend
+
+**Date**: 2025-12-15  
+**Status**: Accepted  
+**Deciders**: Development Team
+
+### Context
+We needed to choose between a monolithic framework (Next.js) or separate frontend (React) and backend (Express).
+
+### Decision
+Use separate React SPA and Express API.
+
+### Alternatives Considered
+1. **Next.js Full-Stack**
+   - Pros: Single codebase, API routes built-in, SSR
+   - Cons: Tighter coupling, harder to scale separately
+   
+2. **Remix**
+   - Pros: Modern React framework, excellent UX
+   - Cons: Newer, smaller ecosystem
+
+### Consequences
+**Positive**:
+- Independent deployment and scaling
+- Clear separation of concerns
+- Easier to integrate n8n webhooks
+- Frontend can be deployed to CDN
+
+**Negative**:
+- Two separate deployments
+- Need CORS configuration
+- Slightly more boilerplate
+
+---
+
+## ADR-002: PostgreSQL + pgvector for Vector Search
+
+**Date**: 2025-12-18  
+**Status**: Accepted  
+**Deciders**: Development Team
+
+### Context
+Needed database for both relational data and vector similarity search for semantic search functionality.
+
+### Decision
+Use PostgreSQL 16 with pgvector extension.
+
+### Alternatives Considered
+1. **Pinecone (Vector Database SaaS)**
+   - Pros: Purpose-built for vectors, managed service
+   - Cons: Expensive at scale ($70+/month), vendor lock-in
+
+2. **Weaviate/Qdrant (Separate Vector DB)**
+   - Pros: Optimized for vectors
+   - Cons: Another service to manage, data synchronization
+
+3. **MongoDB + Vector Search**
+   - Pros: Flexible schema
+   - Cons: No pgvector performance, weaker relational support
+
+### Consequences
+**Positive**:
+- Single database for all data
+- No synchronization issues
+- Cost-effective
+- Excellent PostgreSQL tooling
+- pgvector is production-ready
+
+**Negative**:
+- Vector index rebuild can be slow
+- Not as optimized as purpose-built vector DBs
+- Approximate search (IVFFlat), not exact
+
+### Implementation Notes
+- Use IVFFlat index with 100 lists for <100k vectors
+- Switch to HNSW when available (pgvector 0.5.0+)
+- Rebuild index when data grows 10x
+
+---
+
+## ADR-003: Multi-LLM Provider Support
+
+**Date**: 2026-01-05  
+**Status**: Accepted  
+**Deciders**: Development Team
+
+### Context
+Users have different preferences for LLM providers based on cost, privacy, and quality needs.
+
+### Decision
+Support OpenAI, Anthropic Claude, and local Ollama models with user-configurable settings.
+
+### Alternatives Considered
+1. **OpenAI Only**
+   - Pros: Simpler codebase, consistent behavior
+   - Cons: Vendor lock-in, no privacy option, higher cost
+
+2. **Ollama Only**
+   - Pros: Complete privacy, no API costs
+   - Cons: Requires GPU, slower, setup complexity
+
+### Consequences
+**Positive**:
+- User choice and flexibility
+- Cost optimization (Ollama for dev, OpenAI for prod)
+- Privacy option for sensitive data
+- Reduced vendor lock-in
+
+**Negative**:
+- More complex service layer
+- Need to test with all providers
+- Different output formats to handle
+
+### Implementation Notes
+- Provider selection stored per user in `user_llm_settings`
+- Service layer abstracts provider differences
+- Default to OpenAI with graceful fallback
+
+---
+
+## ADR-004: JWT Stateless Authentication
+
+**Date**: 2025-12-20  
+**Status**: Accepted  
+**Deciders**: Development Team
+
+### Context
+Needed authentication mechanism for API access.
+
+### Decision
+Use JWT (JSON Web Tokens) for stateless authentication with 24-hour expiry.
+
+### Alternatives Considered
+1. **Session-Based (Redis)**
+   - Pros: Can revoke immediately, server control
+   - Cons: Requires Redis, not stateless, harder to scale
+
+2. **Passport.js OAuth**
+   - Pros: Social login support
+   - Cons: More complex, still need session management
+
+### Consequences
+**Positive**:
+- Stateless (no database lookup per request)
+- Scalable (works across multiple backend instances)
+- Standard approach
+
+**Negative**:
+- Cannot revoke tokens before expiry
+- Must store secret securely
+- 24-hour window if compromised
+
+### Future Enhancements
+- Implement refresh token pattern
+- Add token blacklist (Redis) for immediate revocation
+- Reduce access token expiry to 15min with refresh tokens
+
+---
+
+## ADR-005: TanStack Query for Server State
+
+**Date**: 2026-01-08  
+**Status**: Accepted  
+**Deciders**: Development Team
+
+### Context
+Needed efficient client-side state management for server data (memories, chats, etc).
+
+### Decision
+Use TanStack Query (React Query) for all server state management.
+
+### Alternatives Considered
+1. **Redux Toolkit + RTK Query**
+   - Pros: Powerful, integrates with Redux
+   - Cons: More boilerplate, overkill for our needs
+
+2. **SWR**
+   - Pros: Simple, lightweight
+   - Cons: Less features, smaller community
+
+3. **Zustand + Manual Fetching**
+   - Pros: Simple state management
+   - Cons: No built-in caching, refetching, optimistic updates
+
+### Consequences
+**Positive**:
+- Automatic caching and refetching
+- Optimistic updates built-in
+- Request deduplication
+- Background refetching
+- Excellent DevTools
+
+**Negative**:
+- Learning curve for team
+- Another dependency
+
+---
+
+## ADR-006: Zustand for Minimal Global UI State
+
+**Date**: 2026-01-10  
+**Status**: Accepted  
+**Deciders**: Development Team
+
+### Context
+Needed lightweight solution for global UI state (theme, sidebar collapsed, etc).
+
+### Decision
+Use Zustand for minimal global UI state, while TanStack Query handles all server state.
+
+### Alternatives Considered
+1. **Redux**
+   - Pros: Industry standard, powerful DevTools
+   - Cons: Too much boilerplate for simple UI state
+
+2. **React Context**
+   - Pros: Built-in, no dependencies
+   - Cons: Re-render issues, verbose
+
+### Consequences
+**Positive**:
+- Minimal boilerplate
+- Small bundle size (~1KB)
+- No Provider hell
+- Easy to persist (localStorage integration)
+
+**Negative**:
+- Another state management library
+- Less widespread than Redux
+
+### Implementation Notes
+- Use only for UI state (theme, modals, sidebar)
+- All server data stays in TanStack Query
+- Persist theme with `persist` middleware
+
+---
+
+## ADR-007: Docker Compose for Deployment
+
+**Date**: 2025-12-22  
+**Status**: Accepted  
+**Deciders**: Development Team
+
+### Context
+Needed deployment strategy for self-hosted installation.
+
+### Decision
+Use Docker Compose to orchestrate all services (PostgreSQL, n8n, Backend, Frontend, Ollama).
+
+### Alternatives Considered
+1. **Kubernetes**
+   - Pros: Production-grade orchestration, auto-scaling
+   - Cons: Too complex for self-hosted use case, overkill
+
+2. **Manual Installation**
+   - Pros: Full control
+   - Cons: Error-prone, hard to replicate, poor UX
+
+3. **Heroku/Railway**
+   - Pros: Easy deployment
+   - Cons: Monthly costs, not self-hosted
+
+### Consequences
+**Positive**:
+- One-command deployment (`docker-compose up`)
+- Consistent environments (dev/prod)
+- Easy to self-host
+- Portable across systems
+
+**Negative**:
+- Requires Docker knowledge
+- Not suitable for large-scale deployments
+- Manual scaling
+
+### Future Considerations
+- Provide Kubernetes manifests for enterprise users
+- Add cloud deployment guides (AWS, GCP, Azure)
+
+---
+
+## ADR-008: ES Modules in Backend
+
+**Date**: 2025-12-16  
+**Status**: Accepted  
+**Deciders**: Development Team
+
+### Context
+Needed to choose module system for Node.js backend.
+
+### Decision
+Use ES Modules (`import`/`export`) instead of CommonJS (`require`).
+
+### Alternatives Considered
+1. **CommonJS (require)**
+   - Pros: More mature, wider compatibility
+   - Cons: Older standard, verbose
+
+### Consequences
+**Positive**:
+- Modern JavaScript standard
+- Better tree-shaking
+- Cleaner syntax
+- Future-proof
+
+**Negative**:
+- Some older packages don't support ESM
+- Need `"type": "module"` in package.json
+
+### Implementation Notes
+- Set `"type": "module"` in package.json
+- Use `.js` extension for all files
+- Import with `.js` extension: `import x from './file.js'`
+
+---
+
+## ADR-009: n8n for Workflow Automation
+
+**Date**: 2025-12-28  
+**Status**: Accepted  
+**Deciders**: Development Team
+
+### Context
+Needed workflow automation for Slack integration and future integrations.
+
+### Decision
+Use n8n (self-hosted) for workflow automation.
+
+### Alternatives Considered
+1. **Zapier**
+   - Pros: Easy to use, many integrations
+   - Cons: SaaS only, expensive ($20+/month), not self-hosted
+
+2. **Make (Integromat)**
+   - Pros: Powerful, visual
+   - Cons: SaaS only, costly
+
+3. **Custom Webhooks**
+   - Pros: Full control
+   - Cons: Have to code each integration
+
+### Consequences
+**Positive**:
+- Self-hosted (fits our model)
+- Visual workflow builder
+- Extensive integrations (400+)
+- Free and open-source
+
+**Negative**:
+- Another service to manage
+- Learning curve for complex workflows
+
+---
+
+## ADR-010: Tailwind CSS for Styling
+
+**Date**: 2025-12-17  
+**Status**: Accepted  
+**Deciders**: Development Team
+
+### Context
+Needed CSS framework for rapid UI development.
+
+### Decision
+Use Tailwind CSS utility-first framework.
+
+### Alternatives Considered
+1. **Styled Components**
+   - Pros: Component-scoped styles, dynamic styling
+   - Cons: Runtime overhead, larger bundle
+
+2. **CSS Modules**
+   - Pros: Simple, scoped styles
+   - Cons: More files, no utility classes
+
+3. **Bootstrap**
+   - Pros: Pre-built components
+   - Cons: Heavy, opinionated design
+
+### Consequences
+**Positive**:
+- Rapid prototyping
+- Consistent design system
+- Small production bundle (PurgeCSS)
+- No naming conflicts
+
+**Negative**:
+- Long className strings
+- Learning curve for utility classes
+
+---
+
+## Deprecated/Superseded Decisions
+
+### ADR-004-DEPRECATED: Session-Based Auth (Superseded by JWT)
+Originally considered session-based auth with Redis, but moved to JWT for better scalability.
+
+---
+
+## Future Decisions to Make
+
+1. **Testing Framework**: Jest vs Vitest vs Playwright
+2. **TypeScript Migration**: Incremental adoption strategy
+3. **GraphQL vs REST**: If API complexity grows
+4. **Microservices**: If scaling requirements increase
+5. **Caching Layer**: Redis for distributed caching
+6. **Message Queue**: Bull/BullMQ for async jobs
+
+---
+
+**Last Updated**: 2026-01-24  
+**Total ADRs**: 10 (9 accepted, 1 deprecated)  
+**Next Review**: Q2 2026
