@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { llmSettingsApi } from '../services/api'
-import { Cpu, Download, Trash2, RefreshCw, ChevronDown, ChevronUp, Info } from 'lucide-react'
+import { Cpu, Download, Trash2, RefreshCw, ChevronDown, ChevronUp, Info, Loader2 } from 'lucide-react'
 
 export default function LLMSettings() {
   const queryClient = useQueryClient()
   const [message, setMessage] = useState('')
+  const [saveStatus, setSaveStatus] = useState('idle') // 'idle' | 'saving' | 'saved' | 'error'
   const [expandedAreas, setExpandedAreas] = useState({ chat: true })
+  const [autoSaveTimeout, setAutoSaveTimeout] = useState(null)
+  const [downloadingModel, setDownloadingModel] = useState(null) // Track which model is downloading
+  const [downloadProgress, setDownloadProgress] = useState(0)
 
   // Fetch user's LLM settings
   const { data: settingsData, isLoading: settingsLoading } = useQuery({
@@ -74,37 +78,99 @@ export default function LLMSettings() {
   // Update settings mutation
   const updateMutation = useMutation({
     mutationFn: async (data) => {
+      console.log('[LLM Settings] Saving settings:', JSON.stringify(data, null, 2))
       const response = await llmSettingsApi.updateSettings(data)
+      console.log('[LLM Settings] Save response:', response.data)
       return response.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['llmSettings'])
-      setMessage('Settings updated successfully')
-      setTimeout(() => setMessage(''), 3000)
+      setSaveStatus('saved')
+      setTimeout(() => setSaveStatus('idle'), 2000)
     },
     onError: (error) => {
+      console.error('[LLM Settings] Save error:', error)
+      setSaveStatus('error')
       setMessage(error.response?.data?.message || 'Failed to update settings')
-      setTimeout(() => setMessage(''), 3000)
+      setTimeout(() => {
+        setSaveStatus('idle')
+        setMessage('')
+      }, 3000)
     }
   })
 
-  // Pull Ollama model mutation
+  // Pull Ollama model mutation with progress tracking
   const pullModelMutation = useMutation({
     mutationFn: async (modelName) => {
+      setDownloadingModel(modelName)
+      setDownloadProgress(0)
+      setMessage(`Starting download of ${modelName}...`)
+      
       const response = await llmSettingsApi.pullOllamaModel(modelName)
+      
+      // Start polling for progress
+      pollDownloadProgress(modelName)
+      
       return response.data
     },
-    onSuccess: (data) => {
-      setMessage(data.message)
-      setTimeout(() => {
-        refetchOllama()
-        setMessage('')
-      }, 3000)
+    onSuccess: (data, modelName) => {
+      // Initial success message
+      setMessage(`Downloading ${modelName}... This may take several minutes.`)
     },
-    onError: (error) => {
-      setMessage(error.response?.data?.message || 'Failed to pull model')
+    onError: (error, modelName) => {
+      setDownloadingModel(null)
+      setDownloadProgress(0)
+      setMessage(error.response?.data?.message || `Failed to download ${modelName}`)
+      setTimeout(() => setMessage(''), 5000)
     }
   })
+
+  // Poll Ollama to check if model download is complete
+  const pollDownloadProgress = async (modelName) => {
+    const pollInterval = setInterval(async () => {
+      try {
+        // Check if model exists in installed models
+        const response = await llmSettingsApi.getOllamaStatus()
+        const installedModels = response.data.data.models || []
+        const isInstalled = installedModels.some(m => m.name === modelName)
+        
+        if (isInstalled) {
+          // Download complete!
+          clearInterval(pollInterval)
+          setDownloadingModel(null)
+          setDownloadProgress(100)
+          setMessage(`✓ Successfully downloaded ${modelName}!`)
+          
+          // Refresh the models list
+          await refetchOllama()
+          
+          // Clear message after 3 seconds
+          setTimeout(() => {
+            setMessage('')
+            setDownloadProgress(0)
+          }, 3000)
+        } else {
+          // Still downloading - increment progress (simulated since Ollama API doesn't provide real progress)
+          setDownloadProgress(prev => {
+            if (prev < 90) return prev + 5
+            return prev
+          })
+        }
+      } catch (error) {
+        console.error('Error polling download progress:', error)
+      }
+    }, 2000) // Check every 2 seconds
+
+    // Safety timeout - stop polling after 10 minutes
+    setTimeout(() => {
+      clearInterval(pollInterval)
+      if (downloadingModel) {
+        setDownloadingModel(null)
+        setMessage(`Download of ${modelName} is taking longer than expected. Check Ollama logs.`)
+        setTimeout(() => setMessage(''), 5000)
+      }
+    }, 600000)
+  }
 
   // Delete Ollama model mutation
   const deleteModelMutation = useMutation({
@@ -123,18 +189,47 @@ export default function LLMSettings() {
   })
 
   const handleSave = () => {
+    setSaveStatus('saving')
     updateMutation.mutate(settings)
   }
 
   const handleAreaChange = (area, field, value) => {
-    setSettings(prev => ({
-      ...prev,
+    console.log(`[LLM Settings] Changing ${area}.${field} to:`, value)
+    
+    const newSettings = {
+      ...settings,
       [area]: {
-        ...prev[area],
+        ...settings[area],
         [field]: value
       }
-    }))
+    }
+    
+    console.log('[LLM Settings] New settings state:', newSettings)
+    setSettings(newSettings)
+
+    // Auto-save after 1 second of no changes
+    if (autoSaveTimeout) {
+      clearTimeout(autoSaveTimeout)
+    }
+    
+    setSaveStatus('idle')
+    const timeoutId = setTimeout(() => {
+      console.log('[LLM Settings] Auto-saving settings:', newSettings)
+      setSaveStatus('saving')
+      updateMutation.mutate(newSettings)
+    }, 1000)
+    
+    setAutoSaveTimeout(timeoutId)
   }
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimeout) {
+        clearTimeout(autoSaveTimeout)
+      }
+    }
+  }, [autoSaveTimeout])
 
   const toggleArea = (area) => {
     setExpandedAreas(prev => ({
@@ -178,9 +273,24 @@ export default function LLMSettings() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-800">LLM Settings</h2>
-        <p className="text-slate-500">Configure AI providers and models for different app features</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">LLM Settings</h2>
+          <p className="text-slate-500">Configure AI providers and models for different app features</p>
+        </div>
+        {saveStatus !== 'idle' && (
+          <div className={`px-4 py-2 rounded-lg text-sm font-medium ${
+            saveStatus === 'saving' 
+              ? 'bg-blue-50 text-blue-700' 
+              : saveStatus === 'saved'
+              ? 'bg-emerald-50 text-emerald-700'
+              : 'bg-red-50 text-red-700'
+          }`}>
+            {saveStatus === 'saving' && 'Saving...'}
+            {saveStatus === 'saved' && '✓ Saved'}
+            {saveStatus === 'error' && '✗ Error'}
+          </div>
+        )}
       </div>
 
       {message && (
@@ -336,36 +446,64 @@ export default function LLMSettings() {
           <div className="space-y-2">
             <h4 className="font-medium text-slate-700">Recommended Models</h4>
             <div className="grid gap-2">
-              {ollamaData.recommended.chat.map(model => (
-                <div key={model.name} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                  <div>
-                    <p className="font-medium text-slate-700">{model.name}</p>
-                    <p className="text-sm text-slate-500">{model.description} • {model.size}</p>
+              {ollamaData.recommended.chat.map(model => {
+                const isDownloading = downloadingModel === model.name
+                const isAnyDownloading = downloadingModel !== null
+                
+                return (
+                  <div key={model.name} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                    <div className="flex-1">
+                      <p className="font-medium text-slate-700">{model.name}</p>
+                      <p className="text-sm text-slate-500">{model.description} • {model.size}</p>
+                      {isDownloading && (
+                        <div className="mt-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="flex-1 bg-slate-200 rounded-full h-2 overflow-hidden">
+                              <div 
+                                className="bg-primary-600 h-full transition-all duration-500 ease-out"
+                                style={{ width: `${downloadProgress}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium text-slate-600">{downloadProgress}%</span>
+                          </div>
+                          <p className="text-xs text-slate-600">Downloading... This may take several minutes</p>
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => pullModelMutation.mutate(model.name)}
+                      disabled={isAnyDownloading}
+                      className={`flex items-center gap-2 text-sm px-4 py-2 rounded-lg font-medium transition-colors ${
+                        isDownloading
+                          ? 'bg-primary-600 text-white cursor-wait'
+                          : isAnyDownloading
+                          ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                          : 'btn-primary'
+                      }`}
+                    >
+                      {isDownloading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Downloading
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-4 h-4" />
+                          Pull
+                        </>
+                      )}
+                    </button>
                   </div>
-                  <button
-                    onClick={() => pullModelMutation.mutate(model.name)}
-                    disabled={pullModelMutation.isPending}
-                    className="btn-primary flex items-center gap-2 text-sm"
-                  >
-                    <Download className="w-4 h-4" />
-                    Pull
-                  </button>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
       </div>
 
-      {/* Save Button */}
-      <div className="flex justify-end">
-        <button
-          onClick={handleSave}
-          disabled={updateMutation.isPending}
-          className="btn-primary"
-        >
-          {updateMutation.isPending ? 'Saving...' : 'Save All Settings'}
-        </button>
+      {/* Info about auto-save */}
+      <div className="text-center text-sm text-slate-500 pt-4 border-t border-slate-200">
+        Settings are automatically saved as you change them
       </div>
     </div>
   )

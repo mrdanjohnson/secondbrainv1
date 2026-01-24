@@ -140,10 +140,15 @@ export async function deleteMemory(id) {
 export async function searchMemoriesByVector(queryEmbedding, options = {}) {
   const { limit = 10, category, tags, threshold = 0.5 } = options;
 
+  console.log('[VECTOR searchByVector] Input embedding type:', typeof queryEmbedding, 'isArray:', Array.isArray(queryEmbedding));
+  console.log('[VECTOR searchByVector] Options:', options);
+
   // Convert embedding array to PostgreSQL vector format
   const embeddingVector = Array.isArray(queryEmbedding) 
     ? `[${queryEmbedding.join(',')}]` 
     : queryEmbedding;
+
+  console.log('[VECTOR searchByVector] Converted vector length:', embeddingVector.length, 'first 50 chars:', embeddingVector.substring(0, 50));
 
   let whereConditions = ['embedding IS NOT NULL'];
   const params = [embeddingVector];
@@ -161,15 +166,20 @@ export async function searchMemoriesByVector(queryEmbedding, options = {}) {
     paramIndex++;
   }
 
-  const result = await query(
-    `SELECT *, 
+  const finalParams = [...params, limit];
+  const sqlQuery = `SELECT *, 
             1 - (embedding <=> $1::vector) as similarity
      FROM memories 
      WHERE ${whereConditions.join(' AND ')}
      ORDER BY embedding <=> $1::vector
-     LIMIT $${paramIndex}`,
-    [...params, limit]
-  );
+     LIMIT $${paramIndex}`;
+  
+  console.log('[VECTOR searchByVector] Executing SQL:', sqlQuery);
+  console.log('[VECTOR searchByVector] Params count:', finalParams.length, 'paramIndex:', paramIndex);
+  console.log('[VECTOR searchByVector] Param 1 (embedding) length:', finalParams[0].length);
+  console.log('[VECTOR searchByVector] Param 2 (limit):', finalParams[1]);
+
+  const result = await query(sqlQuery, finalParams);
 
   // Log similarities for debugging
   if (process.env.NODE_ENV === 'development') {
@@ -198,6 +208,7 @@ export async function searchMemoriesByText(searchText, options = {}) {
   console.log('[VECTOR] searchMemoriesByText called with:', { searchText, options });
   const embedding = await import('./aiService.js').then(m => m.generateEmbedding(searchText));
   console.log('[VECTOR] Generated embedding length:', embedding?.length);
+  console.log('[VECTOR] First 5 embedding values:', embedding?.slice(0, 5));
   const results = await searchMemoriesByVector(embedding, options);
   console.log('[VECTOR] searchMemoriesByText returning:', results.length, 'results');
   return results;

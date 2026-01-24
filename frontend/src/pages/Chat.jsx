@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { chatApi, memoriesApi, categoriesApi } from '../services/api'
-import { Send, Plus, Trash2, Bot, User, Loader2, Sparkles, X, CheckSquare, Square, FileText, ChevronDown, CheckCircle } from 'lucide-react'
+import { chatApi, memoriesApi, categoriesApi, llmSettingsApi } from '../services/api'
+import { Send, Plus, Trash2, Bot, User, Loader2, Sparkles, X, CheckSquare, Square, FileText, ChevronDown, CheckCircle, Cpu } from 'lucide-react'
 
 export default function Chat() {
   const [selectedSession, setSelectedSession] = useState(null)
@@ -29,6 +29,12 @@ export default function Chat() {
   })
 
   const categories = categoriesData?.data || categoriesData || []
+
+  // Load LLM settings to display current model
+  const { data: llmSettings } = useQuery({
+    queryKey: ['llmSettings'],
+    queryFn: () => llmSettingsApi.getSettings().then(res => res.data.data)
+  })
 
   // Load memories for selector
   const { data: memories } = useQuery({
@@ -279,6 +285,27 @@ export default function Chat() {
           </div>
         ) : (
           <>
+            {/* Model Display Banner */}
+            <div className="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-primary-600" />
+                <span className="text-sm font-medium text-slate-700">
+                  {llmSettings?.chat?.provider === 'openai' && 'OpenAI'}
+                  {llmSettings?.chat?.provider === 'anthropic' && 'Anthropic'}
+                  {llmSettings?.chat?.provider === 'ollama' && 'Ollama'}
+                  {!llmSettings?.chat?.provider && 'Loading...'}
+                </span>
+                <span className="text-sm text-slate-500">•</span>
+                <span className="text-sm text-slate-600">
+                  {llmSettings?.chat?.model || 'Loading model...'}
+                </span>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-slate-500">
+                <span>Temp: {llmSettings?.chat?.temperature || '—'}</span>
+                <span>Max: {llmSettings?.chat?.maxTokens || '—'}</span>
+              </div>
+            </div>
+
             {/* Saved Memory Notification */}
             {savedMemoryNotification && (
               <div className="bg-green-50 border-b border-green-200 p-3 flex items-center justify-between">

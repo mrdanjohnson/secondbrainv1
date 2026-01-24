@@ -172,28 +172,96 @@ export async function deleteOllamaModel(modelName) {
 
 /**
  * Get recommended Ollama models for different use cases
+ * Models are optimized for RAG (Retrieval-Augmented Generation) with Second Brain context
  * @returns {Object} Categorized model recommendations
  */
 export function getRecommendedOllamaModels() {
   return {
     chat: [
-      { name: 'llama3.2', size: '2GB', description: 'Fast, efficient for chat' },
-      { name: 'llama3.2:3b', size: '2GB', description: 'Lightweight, good for simple tasks' },
-      { name: 'llama3.1:8b', size: '4.7GB', description: 'Balanced performance' },
-      { name: 'smollm2:1.7b', size: '1GB', description: 'Very fast inference, resource-constrained' },
-      { name: 'deepseek-r1:1.5b', size: '900MB', description: 'Optimized for reasoning tasks' },
-      { name: 'qwen2.5:0.5b', size: '500MB', description: 'Smallest model, lightning-fast' },
-      { name: 'mistral', size: '4.1GB', description: 'Good reasoning capabilities' },
-      { name: 'mixtral:8x7b', size: '26GB', description: 'High performance, requires more resources' }
+      // Recommended for RAG/Chat (good quality-to-performance ratio)
+      { 
+        name: 'llama3.2:3b', 
+        size: '2GB', 
+        description: 'Minimum size for decent RAG performance - Good instruction following, handles context well'
+      },
+      { 
+        name: 'llama3.1:8b', 
+        size: '4.7GB', 
+        description: 'Better quality, good balance - Excellent for chat with context, strong reasoning'
+      },
+      { 
+        name: 'qwen2.5:7b', 
+        size: '4.7GB', 
+        description: 'Excellent instruction following - Very good at using provided context accurately'
+      },
+      { 
+        name: 'mistral:7b-instruct', 
+        size: '4.1GB', 
+        description: 'Strong at following context - Reliable for RAG, good reasoning capabilities'
+      },
+      
+      // Premium options (if you have hardware)
+      { 
+        name: 'qwen2.5:14b', 
+        size: '9GB', 
+        description: 'Great middle ground - Significantly better quality, still reasonable resource usage'
+      },
+      { 
+        name: 'llama3.1:70b', 
+        size: '40GB', 
+        description: 'Excellent quality (requires 40GB+ RAM) - Near GPT-4 level for context understanding'
+      },
+      { 
+        name: 'mixtral:8x7b', 
+        size: '26GB', 
+        description: 'High performance mixture-of-experts - Excellent reasoning, requires 32GB+ RAM'
+      },
+      
+      // NOT recommended for RAG (too small, high hallucination)
+      { 
+        name: 'smollm2:1.7b', 
+        size: '1GB', 
+        description: '⚠️ Too small for RAG - High hallucination rate, ignores context, for testing only'
+      },
+      { 
+        name: 'qwen2.5:0.5b', 
+        size: '500MB', 
+        description: '⚠️ Not suitable for Second Brain - Cannot handle complex prompts or long context'
+      }
     ],
     embeddings: [
-      { name: 'nomic-embed-text', size: '274MB', description: 'High quality embeddings' },
-      { name: 'mxbai-embed-large', size: '669MB', description: 'Large, accurate embeddings' }
+      { 
+        name: 'nomic-embed-text', 
+        size: '274MB', 
+        description: 'High quality embeddings - 768 dimensions, excellent for semantic search'
+      },
+      { 
+        name: 'mxbai-embed-large', 
+        size: '669MB', 
+        description: 'Large, accurate embeddings - 1024 dimensions, best quality for retrieval'
+      },
+      { 
+        name: 'all-minilm', 
+        size: '46MB', 
+        description: 'Lightweight embeddings - 384 dimensions, fast but lower quality'
+      }
     ],
     classification: [
-      { name: 'llama3.2:3b', size: '2GB', description: 'Fast classification' },
-      { name: 'qwen2.5:0.5b', size: '500MB', description: 'Ultra-lightweight classification' },
-      { name: 'phi3', size: '2.3GB', description: 'Efficient for structured tasks' }
+      { 
+        name: 'llama3.2:3b', 
+        size: '2GB', 
+        description: 'Fast classification - Good for categorizing memories and extracting tags'
+      },
+      { 
+        name: 'qwen2.5:7b', 
+        size: '4.7GB', 
+        description: 'Better accuracy - More reliable category assignments, fewer mistakes'
+      },
+      { 
+        name: 'phi3:mini', 
+        size: '2.3GB', 
+        description: 'Efficient for structured tasks - Optimized for JSON output and tagging'
+      }
     ]
   };
 }

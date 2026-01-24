@@ -164,15 +164,19 @@ export const chatController = {
       const threshold = chatSettings.relevancyScore || 0.3;
       
       console.log('[CHAT] Searching for context with:', { message, contextLimit, threshold });
-      contextMemories = await vectorService.searchMemoriesByText(message, {
+      
+      // Generate embedding once and reuse for fallback search
+      const embedding = await generateEmbedding(message);
+      
+      contextMemories = await vectorService.searchMemoriesByVector(embedding, {
         limit: parseInt(contextLimit),
         threshold
       });
       
-      // If no memories meet the threshold, get at least the 1 closest match
+      // If no memories meet the threshold, get at least the 1 closest match using same embedding
       if (contextMemories.length === 0) {
-        console.log('[CHAT] No memories met threshold, fetching closest match');
-        contextMemories = await vectorService.searchMemoriesByText(message, {
+        console.log('[CHAT] No memories met threshold, fetching closest match with same embedding');
+        contextMemories = await vectorService.searchMemoriesByVector(embedding, {
           limit: 1,
           threshold: 0 // No threshold, get the closest match
         });

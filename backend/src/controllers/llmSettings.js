@@ -69,17 +69,21 @@ export const updateLLMSettings = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const { chat, search, classification, embedding } = req.body;
 
+  console.log('[LLM Settings Update] Request body:', JSON.stringify(req.body, null, 2));
+
   const updates = [];
   const values = [];
   let paramCount = 1;
 
   // Build dynamic update query
   if (chat) {
+    console.log('[LLM Settings Update] Chat settings:', chat);
     if (chat.provider) {
       updates.push(`chat_provider = $${paramCount++}`);
       values.push(chat.provider);
     }
     if (chat.model) {
+      console.log(`[LLM Settings Update] Chat model to save: "${chat.model}"`);
       updates.push(`chat_model = $${paramCount++}`);
       values.push(chat.model);
     }
@@ -165,6 +169,9 @@ export const updateLLMSettings = asyncHandler(async (req, res) => {
     RETURNING *
   `;
 
+  console.log('[LLM Settings Update] SQL Query:', query);
+  console.log('[LLM Settings Update] Values:', values);
+
   const result = await db.query(query, values);
 
   if (result.rows.length === 0) {
@@ -175,6 +182,8 @@ export const updateLLMSettings = asyncHandler(async (req, res) => {
   }
 
   const settings = result.rows[0];
+  
+  console.log('[LLM Settings Update] Saved settings (chat_model):', settings.chat_model);
 
   res.json({
     success: true,
