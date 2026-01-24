@@ -156,7 +156,7 @@ async function chatWithOpenAI(messages, context) {
   const systemPrompt = `You are an AI assistant helping the user interact with their "Second Brain" - a personal knowledge management system.
 
 ${context.length > 0 ? `Here are some relevant memories from the user's Second Brain that you should use as context:
-${context.map(m => `- ${m.raw_content} (Category: ${m.category}, Tags: ${m.tags.join(', ')})`).join('\n')}` : ''}
+${context.map(m => `- ${m.rawContent || m.raw_content} (Category: ${m.category}, Tags: ${m.tags?.join(', ') || 'none'})`).join('\n')}` : ''}
 
 Your role is to:
 1. Answer questions based on the context provided
@@ -189,7 +189,7 @@ async function chatWithAnthropic(messages, context) {
   const systemPrompt = `You are an AI assistant helping the user interact with their "Second Brain" - a personal knowledge management system.
 
 ${context.length > 0 ? `Here are some relevant memories from the user's Second Brain:
-${context.map(m => `- ${m.raw_content}`).join('\n')}` : ''}`;
+${context.map(m => `- ${m.rawContent || m.raw_content}`).join('\n')}` : ''}`;
 
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',

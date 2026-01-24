@@ -24,13 +24,18 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
-const limiter = rateLimit({
+// Rate limiting - more lenient for auth endpoints
+const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 50, // limit each IP to 50 login attempts per 15 minutes
+  message: { error: 'Too many login attempts, please try again later.' }
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 500, // More generous limit for development
   message: { error: 'Too many requests, please try again later.' }
 });
-app.use('/api/', limiter);
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
@@ -44,15 +49,15 @@ app.get('/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
-// Public routes
-app.use('/api/auth', authRoutes);
+// Public routes with specific rate limiting
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/webhook', webhookRoutes);
 
-// Protected routes
-app.use('/api/memories', authMiddleware, memoryRoutes);
-app.use('/api/search', authMiddleware, searchRoutes);
-app.use('/api/chat', authMiddleware, chatRoutes);
-app.use('/api/categories', authMiddleware, categoryRoutes);
+// Protected routes with general rate limiting
+app.use('/api/memories', apiLimiter, authMiddleware, memoryRoutes);
+app.use('/api/search', apiLimiter, authMiddleware, searchRoutes);
+app.use('/api/chat', apiLimiter, authMiddleware, chatRoutes);
+app.use('/api/categories', apiLimiter, authMiddleware, categoryRoutes);
 
 // 404 handler
 app.use((req, res) => {

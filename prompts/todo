@@ -1,0 +1,7 @@
+I would like to add a llm tab to the Settings page.
+I would like these features;
+Pick from LLM's available. (claude, openai, ollama (local))
+Pick from Models for those llms
+Max tokens
+Tempreture
+Relevancy score setting of ai chat and search

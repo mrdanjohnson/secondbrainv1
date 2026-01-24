@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 export const chatController = {
   // Send a message and get AI response with context
   sendMessage: asyncHandler(async (req, res) => {
-    const { message, sessionId, contextLimit = 5 } = req.body;
+    const { message, sessionId, contextLimit = 5, specificMemoryIds } = req.body;
     const userId = req.user.id;
 
     if (!message || typeof message !== 'string') {
@@ -21,11 +21,31 @@ export const chatController = {
     }
 
     // Get relevant memories for context
-    console.log('[CHAT] Searching for context with:', { message, contextLimit, threshold: 0.3 });
-    const contextMemories = await vectorService.searchMemoriesByText(message, {
-      limit: parseInt(contextLimit),
-      threshold: 0.3
-    });
+    let contextMemories;
+    if (specificMemoryIds && Array.isArray(specificMemoryIds) && specificMemoryIds.length > 0) {
+      // User selected specific memories
+      console.log('[CHAT] Using specific memories:', specificMemoryIds);
+      const memoriesResult = await query(
+        `SELECT id, raw_content, category, tags 
+         FROM memories 
+         WHERE id = ANY($1::uuid[])`,
+        [specificMemoryIds]
+      );
+      contextMemories = memoriesResult.rows.map(row => ({
+        id: row.id,
+        rawContent: row.raw_content,
+        category: row.category,
+        tags: row.tags,
+        similarity: 1.0 // Manual selection = 100% relevant
+      }));
+    } else {
+      // Auto-search for relevant memories
+      console.log('[CHAT] Searching for context with:', { message, contextLimit, threshold: 0.3 });
+      contextMemories = await vectorService.searchMemoriesByText(message, {
+        limit: parseInt(contextLimit),
+        threshold: 0.3
+      });
+    }
     console.log('[CHAT] Found', contextMemories.length, 'context memories');
 
     // Get conversation history
@@ -119,9 +139,9 @@ export const chatController = {
     const sessionsResult = await query(
       `SELECT s.*, 
               (SELECT content FROM chat_messages 
-               WHERE session_id = s.id 
-               ORDER BY created_at DESC 
-               LIMIT 1) as last_message,
+               WHERE session_id = s.id AND role = 'user'
+               ORDER BY created_at ASC 
+               LIMIT 1) as first_user_message,
               (SELECT COUNT(*) FROM chat_messages 
                WHERE session_id = s.id) as message_count
        FROM chat_sessions s
@@ -134,8 +154,8 @@ export const chatController = {
       success: true,
       data: sessionsResult.rows.map(row => ({
         id: row.id,
-        title: row.title || `Chat ${row.id.slice(0, 8)}`,
-        lastMessage: row.last_message,
+        title: row.title || null,
+        firstUserMessage: row.first_user_message,
         messageCount: parseInt(row.message_count),
         createdAt: row.created_at,
         updatedAt: row.updated_at
