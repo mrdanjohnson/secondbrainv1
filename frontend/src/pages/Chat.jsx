@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { chatApi, memoriesApi, categoriesApi } from '../services/api'
-import { Send, Plus, Trash2, Bot, User, Loader2, Sparkles, X, CheckSquare, Square, FileText, ChevronDown } from 'lucide-react'
+import { Send, Plus, Trash2, Bot, User, Loader2, Sparkles, X, CheckSquare, Square, FileText, ChevronDown, CheckCircle } from 'lucide-react'
 
 export default function Chat() {
   const [selectedSession, setSelectedSession] = useState(null)
@@ -12,6 +12,7 @@ export default function Chat() {
   const [showMemorySelector, setShowMemorySelector] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedMemories, setSelectedMemories] = useState([])
+  const [savedMemoryNotification, setSavedMemoryNotification] = useState(null)
   const messagesEndRef = useRef(null)
   const queryClient = useQueryClient()
 
@@ -49,10 +50,16 @@ export default function Chat() {
   // Send message mutation
   const sendMessageMutation = useMutation({
     mutationFn: (data) => chatApi.sendMessage(data),
-    onSuccess: () => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries(['chatSessions'])
       queryClient.invalidateQueries(['chatMessages', selectedSession?.id])
       setMessage('')
+      
+      // Check if conversation was saved as memory
+      if (response.data.data.savedAsMemory) {
+        setSavedMemoryNotification(response.data.data.savedAsMemory)
+        setTimeout(() => setSavedMemoryNotification(null), 5000)
+      }
     }
   })
 
@@ -255,6 +262,24 @@ export default function Chat() {
           </div>
         ) : (
           <>
+            {/* Saved Memory Notification */}
+            {savedMemoryNotification && (
+              <div className="bg-green-50 border-b border-green-200 p-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <span className="text-sm text-green-800 font-medium">
+                    {savedMemoryNotification.message}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setSavedMemoryNotification(null)}
+                  className="p-1 hover:bg-green-100 rounded"
+                >
+                  <X className="w-4 h-4 text-green-600" />
+                </button>
+              </div>
+            )}
+            
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {messagesLoading ? (

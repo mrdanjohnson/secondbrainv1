@@ -1,6 +1,6 @@
 import { query } from '../db/index.js';
 import * as vectorService from '../services/vectorService.js';
-import { generateChatResponse, generateEmbedding } from '../services/aiService.js';
+import { generateChatResponse, generateEmbedding, classifyAndStructure } from '../services/aiService.js';
 import { asyncHandler, ApiError } from '../middleware/errorHandler.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -14,10 +14,130 @@ export const chatController = {
       throw new ApiError(400, 'Message is required');
     }
 
+    // Check if user wants to save the conversation as a memory
+    const saveConversationRegex = /remember\s+(this\s+)?(conversation|chat|discussion)/i;
+    const shouldSaveConversation = saveConversationRegex.test(message);
+
     // Create or use existing session
     let currentSessionId = sessionId;
     if (!currentSessionId) {
       currentSessionId = uuidv4();
+    }
+
+    // If user wants to save conversation, do it before processing the message
+    let savedMemoryId = null;
+    if (shouldSaveConversation) {
+      // Get full conversation history
+      const fullHistoryResult = await query(
+        `SELECT role, content, created_at 
+         FROM chat_messages 
+         WHERE session_id = $1 
+         ORDER BY created_at ASC`,
+        [currentSessionId]
+      );
+
+      if (fullHistoryResult.rows.length > 0) {
+        // Format conversation as a transcript
+        const transcript = fullHistoryResult.rows.map(msg => {
+          const role = msg.role === 'user' ? 'User' : 'AI';
+          return `${role}: ${msg.content}`;
+        }).join('\n\n');
+
+        const conversationSummary = `AI Chat Conversation\n\n${transcript}`;
+
+        // Generate embedding
+        const embedding = await generateEmbedding(conversationSummary);
+
+        // Classify the conversation
+        let structuredData;
+        try {
+          structuredData = await classifyAndStructure(conversationSummary);
+          // Add 'ai chat' tag
+          structuredData.tags = [...new Set([...structuredData.tags, 'ai chat', 'conversation'])];
+        } catch (error) {
+          console.warn('AI classification failed for conversation, using defaults:', error.message);
+          structuredData = {
+            summary: `Conversation with ${fullHistoryResult.rows.length} messages`,
+            category: 'Journal',
+            tags: ['ai chat', 'conversation'],
+            sentiment: 'neutral'
+          };
+        }
+
+        // Save as memory
+        const memoryData = {
+          raw_content: conversationSummary,
+          structured_content: structuredData,
+          category: structuredData.category,
+          tags: structuredData.tags,
+          embedding,
+          source: 'ai_chat'
+        };
+
+        const savedMemory = await vectorService.createMemory(memoryData);
+        savedMemoryId = savedMemory.id;
+        console.log('[CHAT] Saved conversation as memory:', savedMemoryId);
+
+        // Save user message
+        await query(
+          `INSERT INTO chat_messages (session_id, role, content, memory_context)
+           VALUES ($1, 'user', $2, $3::jsonb)`,
+          [currentSessionId, message, JSON.stringify([])]
+        );
+
+        // Create a friendly canned response
+        const cannedResponse = `I've saved our conversation to your memories! 📝\n\nThis chat has been:\n• Categorized as: ${structuredData.category}\n• Tagged with: ${structuredData.tags.join(', ')}\n\nYou can find it anytime in your Memories tab and I'll be able to reference it in future conversations.`;
+
+        // Save canned response
+        await query(
+          `INSERT INTO chat_messages (session_id, role, content, memory_context)
+           VALUES ($1, 'assistant', $2, $3::jsonb)`,
+          [currentSessionId, cannedResponse, JSON.stringify([])]
+        );
+
+        // Return early with canned response
+        return res.json({
+          success: true,
+          data: {
+            sessionId: currentSessionId,
+            message,
+            response: cannedResponse,
+            contextMemories: [],
+            usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+            savedAsMemory: {
+              id: savedMemoryId,
+              message: 'Conversation saved to your memories!'
+            }
+          }
+        });
+      } else {
+        // No conversation to save yet
+        const noHistoryResponse = "I don't see any conversation history to save yet. Let's chat a bit first, and then you can ask me to remember it! 💬";
+        
+        await query(
+          `INSERT INTO chat_messages (session_id, role, content, memory_context)
+           VALUES ($1, 'user', $2, $3::jsonb)`,
+          [currentSessionId, message, JSON.stringify([])]
+        );
+
+        await query(
+          `INSERT INTO chat_messages (session_id, role, content, memory_context)
+           VALUES ($1, 'assistant', $2, $3::jsonb)`,
+          [currentSessionId, noHistoryResponse, JSON.stringify([])]
+        );
+
+        return res.json({
+          success: true,
+          data: {
+            sessionId: currentSessionId,
+            message,
+            response: noHistoryResponse,
+            contextMemories: [],
+            usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+            savedAsMemory: null
+          }
+        });
+      }
     }
 
     // Get relevant memories for context
@@ -98,7 +218,11 @@ export const chatController = {
           category: m.category,
           similarity: m.similarity
         })),
-        usage: response.usage
+        usage: response.usage,
+        savedAsMemory: savedMemoryId ? {
+          id: savedMemoryId,
+          message: 'Conversation saved to your memories!'
+        } : null
       }
     });
   }),
