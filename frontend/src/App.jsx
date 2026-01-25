@@ -3,6 +3,7 @@ import { useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import RecentMemories from './pages/RecentMemories'
 import Memories from './pages/Memories'
 import Chat from './pages/Chat'
 import Search from './pages/Search'
@@ -37,6 +38,7 @@ function App() {
             <Layout>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/recent" element={<RecentMemories />} />
                 <Route path="/memories" element={<Memories />} />
                 <Route path="/search" element={<Search />} />
                 <Route path="/chat" element={<Chat />} />

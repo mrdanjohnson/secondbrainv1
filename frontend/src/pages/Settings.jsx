@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { User, Lock, Bell, Palette, Database, Trash2, AlertTriangle, Cpu, Code, Copy, Check, ExternalLink, Key } from 'lucide-react'
 import LLMSettings from '../components/LLMSettings'
+import CleanupManagement from '../components/CleanupManagement'
 
 export default function Settings() {
   const { user, updateProfile } = useAuth()
@@ -462,45 +463,54 @@ export default function Settings() {
           )}
 
           {activeTab === 'data' && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-slate-800">Data Management</h3>
-              
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-amber-800">Danger Zone</p>
-                    <p className="text-sm text-amber-700 mt-1">
-                      These actions are irreversible. Please proceed with caution.
-                    </p>
-                  </div>
-                </div>
-              </div>
+            <div className="space-y-8">
+              {/* Cleanup Management Section */}
+              <CleanupManagement />
 
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Trash2 className="w-5 h-5 text-slate-600" />
-                  <div>
-                    <p className="font-medium text-slate-700">Delete all memories</p>
-                    <p className="text-sm text-slate-500">This will permanently delete all your memories</p>
-                  </div>
-                </div>
-                <button className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">
-                  Delete All
-                </button>
-              </div>
+              {/* Divider */}
+              <div className="border-t border-slate-200"></div>
 
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Database className="w-5 h-5 text-slate-600" />
-                  <div>
-                    <p className="font-medium text-slate-700">Export data</p>
-                    <p className="text-sm text-slate-500">Download all your data as JSON</p>
+              {/* Data Management Section */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-slate-800">Data Management</h3>
+
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-amber-800">Danger Zone</p>
+                      <p className="text-sm text-amber-700 mt-1">
+                        These actions are irreversible. Please proceed with caution.
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <button className="btn-secondary">
-                  Export
-                </button>
+
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Trash2 className="w-5 h-5 text-slate-600" />
+                    <div>
+                      <p className="font-medium text-slate-700">Delete all memories</p>
+                      <p className="text-sm text-slate-500">This will permanently delete all your memories</p>
+                    </div>
+                  </div>
+                  <button className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">
+                    Delete All
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Database className="w-5 h-5 text-slate-600" />
+                    <div>
+                      <p className="font-medium text-slate-700">Export data</p>
+                      <p className="text-sm text-slate-500">Download all your data as JSON</p>
+                    </div>
+                  </div>
+                  <button className="btn-secondary">
+                    Export
+                  </button>
+                </div>
               </div>
             </div>
           )}

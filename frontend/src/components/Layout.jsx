@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import {
   LayoutDashboard,
   Brain,
+  Clock,
   Search,
   MessageCircle,
   Settings,
@@ -16,6 +17,7 @@ import {
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/recent', label: 'Recent Memories', icon: Clock },
   { path: '/memories', label: 'Memories', icon: Brain },
   { path: '/search', label: 'Search', icon: Search },
   { path: '/chat', label: 'Chat', icon: MessageCircle },

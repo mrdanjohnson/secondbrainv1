@@ -98,8 +98,9 @@ export default function Memories() {
                 sortOrder: filters.sortOrder === 'ASC' ? 'DESC' : 'ASC'
               })}
               className="p-2 hover:bg-slate-100 rounded-lg"
+              title={filters.sortOrder === 'ASC' ? 'Ascending' : 'Descending'}
             >
-              {filters.sortOrder === 'ASC' 
+              {filters.sortOrder === 'ASC'
                 ? <SortAsc className="w-4 h-4 text-slate-600" />
                 : <SortDesc className="w-4 h-4 text-slate-600" />
               }
@@ -109,7 +110,10 @@ export default function Memories() {
               onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
               className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
             >
-              <option value="created_at">Date</option>
+              <option value="created_at">Created Date</option>
+              <option value="memory_date">Memory Date</option>
+              <option value="due_date">Due Date</option>
+              <option value="received_date">Received Date</option>
               <option value="category">Category</option>
             </select>
           </div>

@@ -18,6 +18,7 @@
 | **helmet** | ^7.1.0 | Security headers |
 | **jsonwebtoken** | ^9.0.2 | JWT authentication |
 | **morgan** | ^1.10.0 | HTTP request logging |
+| **node-cron** | ^3.0.3 | **NEW (v1.1.0)** Cron job scheduler |
 | **openai** | ^4.47.1 | OpenAI API client |
 | **pg** | ^8.11.5 | PostgreSQL client |
 | **uuid** | ^9.0.1 | UUID generation |
@@ -46,9 +47,11 @@
 | **framer-motion** | ^11.2.10 | Animations |
 | **lucide-react** | ^0.379.0 | Icon library |
 | **react** | ^18.3.1 | UI framework |
+| **react-big-calendar** | ^1.19.4 | **NEW (v1.1.0)** Calendar component |
 | **react-dom** | ^18.3.1 | React DOM renderer |
 | **react-markdown** | ^9.0.1 | Markdown rendering |
 | **react-router-dom** | ^6.24.0 | Routing |
+| **recharts** | ^3.7.0 | **NEW (v1.1.0)** Chart library |
 | **zustand** | ^4.5.2 | Global state management |
 
 ### Development Dependencies

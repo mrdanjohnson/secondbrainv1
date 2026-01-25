@@ -27,6 +27,51 @@ npm run db:setup
 
 ## Migration History
 
+### **005_add_cleanup_jobs_table** (Latest)
+**Applied**: 2026-01-25  
+**File**: `backend/src/db/migrations/005_add_cleanup_jobs_table.js`  
+**Status**: ✅ Applied
+
+**Changes**:
+- Created `cleanup_jobs` table for automated memory deletion
+- Created `cleanup_job_logs` table for execution tracking
+- Added indexes:
+  - `idx_cleanup_jobs_user` on `user_id`
+  - `idx_cleanup_jobs_next_run` on `next_run`
+  - `idx_cleanup_job_logs_job` on `job_id`
+  - `idx_cleanup_job_logs_executed` on `executed_at`
+
+**Reason**: Enable scheduled cleanup of old memories based on date/category/tag filters
+
+**Rollback**: Drop tables `cleanup_jobs` and `cleanup_job_logs`
+
+**Data Impact**: None - new feature, no existing data affected
+
+---
+
+### **004_add_additional_date_fields**
+**Applied**: 2026-01-25  
+**File**: `backend/src/db/migrations/004_add_additional_date_fields.js`  
+**Status**: ✅ Applied
+
+**Changes**:
+- Added columns to `memories` table:
+  - `memory_date` (TIMESTAMP WITH TIME ZONE)
+  - `due_date` (TIMESTAMP WITH TIME ZONE)
+  - `received_date` (TIMESTAMP WITH TIME ZONE)
+  - `memory_date_formatted` (VARCHAR(10))
+  - `due_date_formatted` (VARCHAR(10))
+  - `received_date_formatted` (VARCHAR(10))
+- Created index `idx_memories_due_date` on `due_date`
+
+**Reason**: Support multiple date types for memories with natural language parsing and search
+
+**Rollback**: Drop added columns and index
+
+**Data Impact**: Existing memories unaffected - new columns nullable
+
+---
+
 ### **001_initial_schema** (Initial)
 **Applied**: 2026-01-01 (Project initialization)  
 **File**: `backend/src/db/migrations/001_initial_schema.js`  

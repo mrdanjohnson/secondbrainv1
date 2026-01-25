@@ -66,6 +66,12 @@
 │ embedding           VECTOR(1536)│
 │ source              VARCHAR(50) │
 │ slack_message_ts    VARCHAR(50) │
+│ memory_date         TIMESTAMPTZ │ ← NEW (v1.1.0)
+│ due_date            TIMESTAMPTZ │ ← NEW (v1.1.0)
+│ received_date       TIMESTAMPTZ │ ← NEW (v1.1.0)
+│ memory_date_formatted VARCHAR(10)│ ← NEW (v1.1.0) mm/dd/yy
+│ due_date_formatted  VARCHAR(10) │ ← NEW (v1.1.0) mm/dd/yy
+│ received_date_formatted VARCHAR(10)│ ← NEW (v1.1.0) mm/dd/yy
 │ created_at          TIMESTAMPTZ │
 │ updated_at          TIMESTAMPTZ │
 └─────────────────────────────────┘
@@ -106,6 +112,40 @@
 │ migration_name      VARCHAR(100) UNIQUE │
 │ applied_at          TIMESTAMPTZ │
 │ checksum            VARCHAR(64) │
+└─────────────────────────────────┘
+
+┌──────────┐
+│  users   │
+└──────┬───┘
+       │ 1
+       │
+       │ n
+┌──────▼──────────────────────────┐
+│      cleanup_jobs               │ ← NEW (v1.1.0)
+├─────────────────────────────────┤
+│ id (PK)             UUID        │
+│ user_id (FK)        UUID        │ → users.id (CASCADE DELETE)
+│ name                VARCHAR(255)│
+│ filters             JSONB       │
+│ schedule            VARCHAR(20) │ CHECK: 'daily'|'weekly'|'monthly'
+│ is_active           BOOLEAN     │
+│ next_run            TIMESTAMPTZ │
+│ last_run            TIMESTAMPTZ │
+│ created_at          TIMESTAMPTZ │
+│ updated_at          TIMESTAMPTZ │
+└──────────┬──────────────────────┘
+           │ 1
+           │
+           │ n
+┌──────────▼──────────────────────┐
+│    cleanup_job_logs             │ ← NEW (v1.1.0)
+├─────────────────────────────────┤
+│ id (PK)             UUID        │
+│ job_id (FK)         UUID        │ → cleanup_jobs.id (CASCADE DELETE)
+│ deleted_count       INTEGER     │
+│ executed_at         TIMESTAMPTZ │
+│ status              VARCHAR(20) │ CHECK: 'success'|'failed'
+│ error_message       TEXT        │
 └─────────────────────────────────┘
 ```
 
@@ -218,6 +258,12 @@
 - `embedding`: Vector representation (1536 dimensions) for semantic search
 - `source`: Where the memory came from ('slack', 'manual', 'api')
 - `slack_message_ts`: Slack message timestamp (if source is slack)
+- `memory_date`: **NEW (v1.1.0)** - Date of the memory/event
+- `due_date`: **NEW (v1.1.0)** - When task/item is due
+- `received_date`: **NEW (v1.1.0)** - When item was received
+- `memory_date_formatted`: **NEW (v1.1.0)** - Formatted as mm/dd/yy
+- `due_date_formatted`: **NEW (v1.1.0)** - Formatted as mm/dd/yy
+- `received_date_formatted`: **NEW (v1.1.0)** - Formatted as mm/dd/yy
 - `created_at`: Creation timestamp
 - `updated_at`: Last modification timestamp
 
@@ -227,6 +273,7 @@
 - `idx_memories_tags` (GIN) on `tags` array
 - `idx_memories_created_at` (B-tree DESC) on `created_at`
 - `idx_memories_embedding` (IVFFlat) on `embedding` for vector similarity
+- `idx_memories_due_date` (B-tree) on `due_date` **NEW (v1.1.0)**
 
 **Triggers**:
 - `update_memories_updated_at` - Auto-update `updated_at` on UPDATE

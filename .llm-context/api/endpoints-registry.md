@@ -1011,6 +1011,244 @@ Content-Type: application/json
 
 ---
 
+## Analytics Endpoints
+
+### Get Timeline Statistics
+```
+GET /api/analytics/timeline?period=30days&groupBy=day
+```
+
+**Headers**:
+```
+Authorization: Bearer <token>
+```
+
+**Query Parameters**:
+- `period` (optional): `7days`, `30days`, `90days` (default: 30days)
+- `groupBy` (optional): `day`, `week`, `month` (default: day)
+
+**Response** `200 OK`:
+```json
+{
+  "data": {
+    "timeline": [
+      {
+        "date": "2026-01-25",
+        "count": 15
+      }
+    ]
+  }
+}
+```
+
+---
+
+### Get Due Date Statistics
+```
+GET /api/analytics/duedates
+```
+
+**Headers**:
+```
+Authorization: Bearer <token>
+```
+
+**Response** `200 OK`:
+```json
+{
+  "data": {
+    "overdue": {
+      "count": 5,
+      "memories": []
+    },
+    "upcoming": {
+      "next7Days": { "count": 3 },
+      "next30Days": { "count": 12 }
+    }
+  }
+}
+```
+
+---
+
+### Get Busiest Times
+```
+GET /api/analytics/busiest?period=30days
+```
+
+**Headers**:
+```
+Authorization: Bearer <token>
+```
+
+**Response** `200 OK`:
+```json
+{
+  "data": {
+    "busiestDays": [
+      { "dayName": "Monday", "count": 45 }
+    ],
+    "busiestHours": [
+      { "hour": 14, "count": 23 }
+    ]
+  }
+}
+```
+
+---
+
+### Get Summary Statistics
+```
+GET /api/analytics/summary
+```
+
+**Headers**:
+```
+Authorization: Bearer <token>
+```
+
+**Response** `200 OK`:
+```json
+{
+  "data": {
+    "totalMemories": 234,
+    "categoriesCount": 8,
+    "avgPerDay": 3.2,
+    "thisMonth": 87
+  }
+}
+```
+
+---
+
+## Cleanup Job Endpoints
+
+### Get All Cleanup Jobs
+```
+GET /api/cleanup/jobs
+```
+
+**Headers**:
+```
+Authorization: Bearer <token>
+```
+
+**Response** `200 OK`:
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "name": "Weekly old tasks cleanup",
+      "filters": {
+        "dateField": "due_date",
+        "olderThan": "30 days",
+        "categories": ["Task"],
+        "tags": ["completed"]
+      },
+      "schedule": "weekly",
+      "isActive": true,
+      "nextRun": "2026-02-01T00:00:00Z",
+      "lastRun": "2026-01-25T00:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+### Create Cleanup Job
+```
+POST /api/cleanup/jobs
+```
+
+**Headers**:
+```
+Authorization: Bearer <token>
+```
+
+**Request Body**:
+```json
+{
+  "name": "Monthly cleanup",
+  "filters": {
+    "dateField": "memory_date",
+    "olderThan": "90 days",
+    "categories": ["Unsorted"],
+    "tags": ["archived"]
+  },
+  "schedule": "monthly",
+  "isActive": true
+}
+```
+
+**Response** `201 Created`:
+```json
+{
+  "data": {
+    "id": "uuid",
+    "name": "Monthly cleanup",
+    "createdAt": "2026-01-25T..."
+  }
+}
+```
+
+---
+
+### Run Cleanup Job
+```
+POST /api/cleanup/jobs/:id/run
+```
+
+**Headers**:
+```
+Authorization: Bearer <token>
+```
+
+**Response** `200 OK`:
+```json
+{
+  "data": {
+    "deleted": 15,
+    "timestamp": "2026-01-25T..."
+  }
+}
+```
+
+---
+
+### Preview Cleanup
+```
+POST /api/cleanup/preview
+```
+
+**Headers**:
+```
+Authorization: Bearer <token>
+```
+
+**Request Body**:
+```json
+{
+  "filters": {
+    "dateField": "due_date",
+    "olderThan": "30 days"
+  }
+}
+```
+
+**Response** `200 OK`:
+```json
+{
+  "data": {
+    "count": 23,
+    "sample": []
+  }
+}
+```
+
+---
+
 ## Error Responses
 
 All endpoints may return these error responses:
@@ -1068,6 +1306,7 @@ All endpoints may return these error responses:
 ---
 
 **API Version**: v1  
-**Last Updated**: 2026-01-24  
+**Last Updated**: 2026-01-25  
+**Recent Changes**: Added analytics and cleanup endpoints for date management feature
 **For authentication details, see**: `authentication.md`  
 **For error handling, see**: `error-codes.md`

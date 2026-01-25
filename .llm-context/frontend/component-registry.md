@@ -16,13 +16,17 @@ App
 │   └── Protected Routes
 │       ├── Layout
 │       │   ├── Dashboard (Page)
+│       │   ├── Recent Memories (Page)
+│       │   │   ├── CreateMemoryModal
+│       │   │   └── MemoryCard (multiple)
 │       │   ├── Memories (Page)
 │       │   │   ├── CreateMemoryModal
 │       │   │   └── MemoryCard (multiple)
 │       │   ├── Search (Page)
 │       │   ├── Chat (Page)
 │       │   └── Settings (Page)
-│       │       └── LLMSettings
+│       │       ├── LLMSettings
+│       │       └── CleanupManagement
 └── React Query Provider
 ```
 
@@ -48,11 +52,12 @@ interface LayoutProps {
 - Logout button
 
 **Navigation Items**:
-- Dashboard (`/dashboard`)
-- Memories (`/memories`)
-- Search (`/search`)
-- Chat (`/chat`)
-- Settings (`/settings`)
+- Dashboard (`/`) - Analytics and visualizations
+- Recent Memories (`/recent`) - Quick view with stats and recent memories
+- Memories (`/memories`) - Full list with advanced filtering
+- Search (`/search`) - Semantic search with natural language dates
+- Chat (`/chat`) - AI chat with RAG
+- Settings (`/settings`) - Configuration and cleanup management
 
 **Usage**:
 ```jsx
@@ -85,6 +90,10 @@ interface MemoryCardProps {
     tags: string[];
     created_at: string;
     updated_at: string;
+    memoryDateFormatted?: string;      // NEW (v1.1.0)
+    dueDateFormatted?: string;          // NEW (v1.1.0)
+    receivedDateFormatted?: string;     // NEW (v1.1.0)
+    dueDate?: string;                   // NEW (v1.1.0)
     structured_content?: {
       summary: string;
       sentiment: string;
@@ -99,6 +108,10 @@ interface MemoryCardProps {
 **Features**:
 - Colored category badge (8 category colors)
 - Tag display (up to 5 visible, "+N more" for extra)
+- **Date display with icons** (NEW v1.1.0):
+  - Memory date (Calendar icon)
+  - Due date (Clock/AlertCircle icon, red if overdue)
+  - Received date (Inbox icon)
 - Edit mode (inline editing)
 - Delete with confirmation
 - Dropdown menu (Edit, Delete)
@@ -230,34 +243,66 @@ function SettingsPage() {
 ## Page Components
 
 ### **Dashboard**
-**File**: `src/pages/Dashboard.jsx`  
-**Purpose**: Overview and statistics
+**File**: `src/pages/Dashboard.jsx`
+**Purpose**: Analytics dashboard with visualizations
 
-**Features**:
-- Total memory count
-- Memories by category (pie chart or list)
-- Recent memories (last 10)
-- This week/month statistics
-- Quick actions (Create Memory, Search, Chat)
+**Features** (UPDATED v1.1.0):
+- Summary statistics cards (Total Memories, Categories, Avg per Day, This Month)
+- CalendarView component (month view with memory density)
+- DueDateWidget (overdue and upcoming tasks)
+- AnalyticsCharts (timeline activity, busiest times)
 
 **Data Fetched**:
-- `/api/memories/stats`
-- `/api/memories/recent`
+- `/api/analytics/summary` - Summary statistics
+- `/api/analytics/timeline` - Timeline data for charts
+- `/api/analytics/duedates` - Due date statistics
+- `/api/analytics/busiest` - Busiest times analysis
+
+---
+
+### **Recent Memories**
+**File**: `src/pages/RecentMemories.jsx`
+**Purpose**: Quick overview with stats and recent memories (ADDED v1.2.0)
+
+**Features**:
+- Statistics grid (Total Memories, Categories, Recent 7 days, Most Active)
+- Category breakdown with interactive selection
+- Recent memories list (last 10)
+- Quick create memory button
+- Refresh button
+
+**Data Fetched**:
+- `/api/memories/stats` - Basic statistics
+- `/api/memories/recent` - Recent memories
+- `/api/categories` - Category list
+
+**Usage**:
+```jsx
+// Shows overview similar to original dashboard
+// Includes MemoryCard components for recent items
+// CreateMemoryModal for quick memory creation
+```
 
 ---
 
 ### **Memories**
-**File**: `src/pages/Memories.jsx`  
+**File**: `src/pages/Memories.jsx`
 **Purpose**: Browse and manage all memories
 
 **Features**:
 - List of all memories (paginated)
 - Filter by category
 - Filter by tags
-- Sort by date (newest/oldest)
+- **Sort by multiple date fields** (UPDATED v1.2.0):
+  - Created Date
+  - Memory Date
+  - Due Date
+  - Received Date
+  - Category
 - Search bar (client-side filter)
 - Create new memory button
 - Memory count indicator
+- Grid/List view toggle
 - Infinite scroll (future) or pagination
 
 **Layout**:
@@ -268,12 +313,13 @@ function SettingsPage() {
 **State**:
 - Selected filters (category, tags)
 - Current page/offset
-- Sort direction
+- Sort field and direction
+- View mode (grid/list)
 
 ---
 
 ### **Search**
-**File**: `src/pages/Search.jsx`  
+**File**: `src/pages/Search.jsx`
 **Purpose**: Semantic and text search
 
 **Features**:
@@ -285,13 +331,20 @@ function SettingsPage() {
 - Filter by category
 - Sort by similarity/relevance
 - No results state
+- **Natural language date filters** (NEW v1.2.0):
+  - Expandable date filter section
+  - Quick presets: Today, Yesterday, Last Week, Last Month, Last 3 Days, This Week
+  - Custom text input for natural language queries
+  - Date field selector (memory_date, due_date, received_date)
+  - Active filter indicator with clear button
 
 **Search Flow**:
 1. User types query
-2. Debounce 300ms
-3. Call `/api/search/semantic` or `/api/search`
-4. Display results with scores
-5. Click to view full memory
+2. (Optional) User adds date filter
+3. Debounce 300ms
+4. Call `/api/search/semantic` with dateQuery and dateField params
+5. Display results with scores
+6. Click to view full memory
 
 ---
 
@@ -356,15 +409,22 @@ function SettingsPage() {
 ---
 
 ### **Settings**
-**File**: `src/pages/Settings.jsx`  
+**File**: `src/pages/Settings.jsx`
 **Purpose**: User settings and preferences
 
 **Features**:
-- Profile settings (future)
-- LLM Settings (current)
-- Password change (future)
-- Export data (future)
-- Delete account (future)
+- Tabbed interface (Profile, Security, API, LLM Settings, Notifications, Appearance, Data)
+- Profile settings
+- Password change
+- API access documentation with examples
+- LLM Settings component
+- Notification preferences (future)
+- Appearance/theme settings (future)
+- **Data Management** (NEW v1.2.0):
+  - Cleanup Management section (see CleanupManagement component)
+  - Export data button
+  - Delete all memories button
+  - Danger zone warnings
 
 ---
 
@@ -537,6 +597,181 @@ const [isOpen, setIsOpen] = useState(false);
 
 ---
 
+## Analytics & Dashboard Components (v1.1.0)
+
+### **CalendarView**
+**File**: `src/components/CalendarView.jsx`  
+**Purpose**: Visual calendar display of memories by date
+
+**Props**: None (uses React Query internally)
+
+**Features**:
+- Full month/week/day calendar views
+- Color-coded by category
+- Shows all 3 date types:
+  - Memory dates (standard events)
+  - Due dates (📌 prefix)
+  - Received dates (📥 prefix)
+- Click event to view details modal
+- Tooltips on hover
+- Responsive layout
+
+**Dependencies**:
+- react-big-calendar
+- date-fns
+- memoriesApi.getAll()
+
+**Usage**:
+```jsx
+<CalendarView />
+```
+
+---
+
+### **DueDateWidget**
+**File**: `src/components/DueDateWidget.jsx`  
+**Purpose**: Display overdue and upcoming due dates
+
+**Props**: None (uses React Query internally)
+
+**Features**:
+- Overdue count (red, AlertCircle icon)
+- Next 7 days count (orange, Clock icon)
+- Next 30 days count (yellow, CheckCircle icon)
+- Click to navigate to filtered memories
+- Auto-refresh every minute
+- "All caught up" state when empty
+
+**API Dependencies**:
+- analyticsApi.getDueDateStats()
+
+**Navigation**:
+- Overdue → `/memories?filter=overdue`
+- Next 7 days → `/memories?filter=due7days`
+- Next 30 days → `/memories?filter=due30days`
+
+**Usage**:
+```jsx
+<DueDateWidget />
+```
+
+---
+
+### **AnalyticsCharts**
+**File**: `src/components/AnalyticsCharts.jsx`  
+**Purpose**: Timeline and activity visualization
+
+**Props**: None (uses React Query internally)
+
+**Features**:
+- Memory activity line chart (timeline)
+- Busiest days of week bar chart
+- Period selector (7/30/90 days)
+- Responsive charts
+- Loading states
+- Empty states
+
+**Dependencies**:
+- recharts (LineChart, BarChart)
+- date-fns (formatting)
+- analyticsApi.getTimeline()
+- analyticsApi.getBusiestTimes()
+
+**Usage**:
+```jsx
+<AnalyticsCharts />
+```
+
+---
+
+## Cleanup Management Components (v1.2.0)
+
+### **CleanupManagement**
+**File**: `src/components/CleanupManagement.jsx`
+**Purpose**: Full CRUD interface for automated cleanup jobs
+
+**Props**: None (uses React Query + local state)
+
+**Features**:
+- Job list with expandable detail cards
+- Create/Edit modal for job configuration
+- Preview functionality (dry run)
+- Manual run triggers
+- Execution logs viewer
+- Color-coded status indicators
+- React Portal rendering for modals
+
+**Sub-components** (internal):
+- `CreateEditJobModal` - Configuration modal (800+ lines)
+- `JobLogsModal` - Execution history viewer
+
+**Job Configuration**:
+- Basic info: name, description, active/inactive
+- Filter types: date, tag, category, combined
+- Date filters: field (memory_date/due_date/received_date), operator (before/after/equals), value
+- Tags filter: array of tags
+- Categories filter: array of categories
+- Schedule: manual, daily, weekly, monthly
+- Time picker for scheduled jobs
+
+**API Integration**:
+- Uses `cleanupApi` from services/api.js
+- Converts camelCase → snake_case for backend
+- Conditionally includes fields based on filter type
+
+**Modal Implementation**:
+```jsx
+createPortal(
+  <div className="fixed inset-0...">
+    {/* Modal content */}
+  </div>,
+  document.body
+)
+```
+
+**State Management**:
+- Local state for form data
+- React Query for job list, logs, preview
+- Preview data cleared on mount/unmount
+- Time input normalized (HH:MM → HH:MM:SS)
+
+**Usage**:
+```jsx
+<CleanupManagement />
+```
+
+**Features**:
+1. **Job List View**:
+   - Expandable cards with job details
+   - Status badges (Active/Inactive, Schedule type)
+   - Action buttons: Edit, Logs, Run, Delete
+   - Job statistics (last run, deleted count)
+
+2. **Create/Edit Modal**:
+   - Multi-step form with validation
+   - Preview button shows affected memories
+   - Conditional field display based on filter type
+   - Snake_case payload conversion
+
+3. **Logs Modal**:
+   - Success/error status indicators
+   - Execution type badges (manual/scheduled)
+   - Deleted memory counts
+   - Error messages for failed runs
+
+**Validation**:
+- Required: name, filter_type, schedule
+- Conditional: date fields for date filter, tags for tag filter, etc.
+- Preview validates configuration before showing results
+
+**UI Patterns**:
+- Card-based layout with hover effects
+- Collapsible sections for advanced options
+- Color-coded status (green=active, gray=inactive)
+- Icon indicators (Clock, Calendar, Tag, Folder)
+
+---
+
 ## Future Components
 
 ### Planned
@@ -552,7 +787,9 @@ const [isOpen, setIsOpen] = useState(false);
 
 ---
 
-**Last Updated**: 2026-01-24  
-**Component Count**: ~10 (8 pages + 4 shared)  
-**UI Library**: Tailwind CSS + Lucide Icons  
+**Last Updated**: 2026-01-25
+**Last Changed By**: Natural Language Date Search & Cleanup Management UI
+**Change Summary**: Added date filter UI to Search page, date sorting to Memories page, CleanupManagement component (~900 lines) with React Portal modals
+**Component Count**: ~13 (8 pages + 5 major components)
+**UI Library**: Tailwind CSS + Lucide Icons
 **State**: React Query + Zustand + Context

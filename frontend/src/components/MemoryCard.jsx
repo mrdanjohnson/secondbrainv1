@@ -11,7 +11,9 @@ import {
   Edit2,
   Trash2,
   ExternalLink,
-  X
+  X,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 
 const categoryColors = {
@@ -30,6 +32,7 @@ export default function MemoryCard({ memory, onUpdate, compact = false }) {
   const [editing, setEditing] = useState(false)
   const [editContent, setEditContent] = useState(memory.rawContent)
   const [saving, setSaving] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   const colors = categoryColors[memory.category] || categoryColors['Unsorted']
 
@@ -132,6 +135,17 @@ export default function MemoryCard({ memory, onUpdate, compact = false }) {
             <span className={`tag ${colors.bg} ${colors.text}`}>
               {memory.category}
             </span>
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="p-1 hover:bg-slate-100 rounded transition-colors"
+              title={isExpanded ? 'Collapse' : 'Expand'}
+            >
+              {isExpanded ? (
+                <ChevronUp className="w-4 h-4 text-slate-500" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-slate-500" />
+              )}
+            </button>
           </div>
           
           {/* Date fields */}
@@ -204,38 +218,51 @@ export default function MemoryCard({ memory, onUpdate, compact = false }) {
         </div>
       </div>
 
-      {/* Content */}
-      {editing ? (
-        <div className="space-y-3">
-          <textarea
-            value={editContent}
-            onChange={(e) => setEditContent(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            rows={4}
-          />
-          <div className="flex gap-2">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="btn-primary text-sm"
-            >
-              {saving ? 'Saving...' : 'Save'}
-            </button>
-            <button
-              onClick={() => {
-                setEditing(false)
-                setEditContent(memory.rawContent)
-              }}
-              className="btn-secondary text-sm"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        <p className="text-slate-700 whitespace-pre-wrap">
-          {memory.rawContent}
-        </p>
+      {/* Content - only show when expanded */}
+      {isExpanded && (
+        <>
+          {editing ? (
+            <div className="space-y-3">
+              <textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                rows={4}
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="btn-primary text-sm"
+                >
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => {
+                    setEditing(false)
+                    setEditContent(memory.rawContent)
+                  }}
+                  className="btn-secondary text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-slate-700 whitespace-pre-wrap">
+              {memory.rawContent}
+            </p>
+          )}
+
+          {/* Structured content preview */}
+          {memory.structuredContent?.summary && !editing && (
+            <div className="mt-3 pt-3 border-t border-slate-100">
+              <p className="text-xs text-slate-500 italic">
+                "{memory.structuredContent.summary}"
+              </p>
+            </div>
+          )}
+        </>
       )}
 
       {/* Tags */}
