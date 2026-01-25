@@ -8,6 +8,8 @@ export async function createMemory(memoryData) {
     tags,
     embedding,
     source = 'slack',
+    source_id,
+    memory_date,
     slack_message_ts
   } = memoryData;
 
@@ -21,8 +23,8 @@ export async function createMemory(memoryData) {
 
   const result = await query(
     `INSERT INTO memories 
-      (raw_content, structured_content, category, tags, embedding, source, slack_message_ts)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+      (raw_content, structured_content, category, tags, embedding, source, source_id, memory_date, slack_message_ts)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING *`,
     [
       raw_content,
@@ -31,9 +33,26 @@ export async function createMemory(memoryData) {
       tags || [],
       embeddingVector,
       source,
+      source_id || null,
+      memory_date || null,
       slack_message_ts || null
     ]
   );
+
+  return formatMemory(result.rows[0]);
+}
+
+export async function findBySourceId(source, source_id) {
+  if (!source_id) return null;
+  
+  const result = await query(
+    'SELECT * FROM memories WHERE source = $1 AND source_id = $2',
+    [source, source_id]
+  );
+
+  if (result.rows.length === 0) {
+    return null;
+  }
 
   return formatMemory(result.rows[0]);
 }

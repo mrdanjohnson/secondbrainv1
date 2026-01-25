@@ -47,10 +47,23 @@ router.post('/slack', asyncHandler(async (req, res) => {
 
 // Generic webhook for other integrations
 router.post('/generic', asyncHandler(async (req, res) => {
-  const { content, source = 'webhook', metadata } = req.body;
+  const { content, source = 'webhook', source_id, memory_date, category, tags, metadata } = req.body;
 
   if (!content) {
     throw new ApiError(400, 'Content is required');
+  }
+
+  // Check for duplicate using source_id
+  if (source_id) {
+    const existing = await vectorService.findBySourceId(source, source_id);
+    if (existing) {
+      console.log(`Duplicate memory skipped: ${source}:${source_id}`);
+      return res.json({ 
+        success: true, 
+        message: 'Duplicate memory skipped',
+        data: existing
+      });
+    }
   }
 
   const embedding = await generateEmbedding(content);
@@ -59,10 +72,12 @@ router.post('/generic', asyncHandler(async (req, res) => {
   const memory = await vectorService.createMemory({
     raw_content: content,
     structured_content: structuredData,
-    category: structuredData.category,
-    tags: structuredData.tags,
+    category: category || structuredData.category,
+    tags: tags || structuredData.tags,
     embedding,
     source,
+    source_id,
+    memory_date: memory_date || new Date().toISOString(),
     slack_message_ts: metadata?.timestamp
   });
 
