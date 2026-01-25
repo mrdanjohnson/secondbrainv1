@@ -82,4 +82,25 @@ export const llmSettingsApi = {
   deleteOllamaModel: (modelName) => api.delete(`/llm-settings/ollama/models/${modelName}`)
 }
 
+// Analytics API
+export const analyticsApi = {
+  getTimeline: (params) => api.get('/analytics/timeline', { params }),
+  getCategoryDistribution: (params) => api.get('/analytics/categories', { params }),
+  getBusiestTimes: (params) => api.get('/analytics/busiest', { params }),
+  getDueDateStats: () => api.get('/analytics/duedates'),
+  getSummaryStats: () => api.get('/analytics/summary')
+}
+
+// Cleanup API
+export const cleanupApi = {
+  getAllJobs: () => api.get('/cleanup/jobs'),
+  getJob: (id) => api.get(`/cleanup/jobs/${id}`),
+  createJob: (data) => api.post('/cleanup/jobs', data),
+  updateJob: (id, data) => api.put(`/cleanup/jobs/${id}`, data),
+  deleteJob: (id) => api.delete(`/cleanup/jobs/${id}`),
+  runJob: (id) => api.post(`/cleanup/jobs/${id}/run`),
+  previewJob: (data) => api.post('/cleanup/preview', data),
+  getJobLogs: (id, params) => api.get(`/cleanup/jobs/${id}/logs`, { params })
+}
+
 export default api

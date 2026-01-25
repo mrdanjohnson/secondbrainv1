@@ -51,7 +51,7 @@ export const memoriesController = {
 
   // Create a new memory
   createMemory: asyncHandler(async (req, res) => {
-    const { content, category, tags } = req.body;
+    const { content, category, tags, memory_date, due_date, received_date } = req.body;
     const userId = req.user.id;
 
     if (!content || typeof content !== 'string') {
@@ -81,7 +81,10 @@ export const memoriesController = {
       structured_content: structuredData,
       category: structuredData.category,
       tags: [...new Set([...structuredData.tags, ...(tags || [])])],
-      embedding
+      embedding,
+      memory_date,
+      due_date,
+      received_date
     };
 
     const memory = await vectorService.createMemory(memoryData);

@@ -4,6 +4,9 @@ import { memoriesApi } from '../services/api'
 import {
   Tag,
   Calendar,
+  Clock,
+  Inbox,
+  AlertCircle,
   MoreVertical,
   Edit2,
   Trash2,
@@ -29,6 +32,9 @@ export default function MemoryCard({ memory, onUpdate, compact = false }) {
   const [saving, setSaving] = useState(false)
 
   const colors = categoryColors[memory.category] || categoryColors['Unsorted']
+
+  // Check if due date is overdue
+  const isOverdue = memory.dueDate && new Date(memory.dueDate) < new Date()
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this memory?')) return
@@ -79,6 +85,28 @@ export default function MemoryCard({ memory, onUpdate, compact = false }) {
           </button>
         </div>
         
+        {/* Date fields */}
+        <div className="flex items-center gap-3 text-xs text-slate-500 mt-2">
+          {memory.memoryDateFormatted && (
+            <div className="flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              <span>{memory.memoryDateFormatted}</span>
+            </div>
+          )}
+          {memory.dueDateFormatted && (
+            <div className={`flex items-center gap-1 ${isOverdue ? 'text-red-600 font-semibold' : ''}`}>
+              {isOverdue ? <AlertCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+              <span>Due: {memory.dueDateFormatted}</span>
+            </div>
+          )}
+          {memory.receivedDateFormatted && (
+            <div className="flex items-center gap-1">
+              <Inbox className="w-3 h-3" />
+              <span>{memory.receivedDateFormatted}</span>
+            </div>
+          )}
+        </div>
+        
         {memory.tags?.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
             {memory.tags.slice(0, 3).map((tag) => (
@@ -99,14 +127,40 @@ export default function MemoryCard({ memory, onUpdate, compact = false }) {
     <div className="memory-card group">
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className={`tag ${colors.bg} ${colors.text}`}>
-            {memory.category}
-          </span>
-          <span className="flex items-center gap-1 text-xs text-slate-400">
-            <Calendar className="w-3 h-3" />
-            {format(new Date(memory.createdAt), 'MMM d, yyyy')}
-          </span>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <span className={`tag ${colors.bg} ${colors.text}`}>
+              {memory.category}
+            </span>
+          </div>
+          
+          {/* Date fields */}
+          <div className="flex items-center gap-3 text-xs text-slate-500">
+            {memory.memoryDateFormatted && (
+              <div className="flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                <span>{memory.memoryDateFormatted}</span>
+              </div>
+            )}
+            {memory.dueDateFormatted && (
+              <div className={`flex items-center gap-1 ${isOverdue ? 'text-red-600 font-semibold' : ''}`}>
+                {isOverdue ? <AlertCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                <span>Due: {memory.dueDateFormatted}</span>
+              </div>
+            )}
+            {memory.receivedDateFormatted && (
+              <div className="flex items-center gap-1">
+                <Inbox className="w-3 h-3" />
+                <span>Received: {memory.receivedDateFormatted}</span>
+              </div>
+            )}
+            {!memory.memoryDateFormatted && !memory.dueDateFormatted && !memory.receivedDateFormatted && (
+              <div className="flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                {format(new Date(memory.createdAt), 'MMM d, yyyy')}
+              </div>
+            )}
+          </div>
         </div>
         
         <div className="relative">

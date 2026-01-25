@@ -1,4 +1,5 @@
 import { query } from '../db/index.js';
+import { normalizeDate, formatToMMDDYY } from '../utils/dateUtils.js';
 
 export async function createMemory(memoryData) {
   const {
@@ -10,6 +11,8 @@ export async function createMemory(memoryData) {
     source = 'slack',
     source_id,
     memory_date,
+    due_date,
+    received_date,
     slack_message_ts
   } = memoryData;
 
@@ -21,10 +24,22 @@ export async function createMemory(memoryData) {
     embeddingVector = `[${embeddingArray.join(',')}]`;
   }
 
+  // Normalize and format dates
+  const normalizedMemoryDate = normalizeDate(memory_date);
+  const normalizedDueDate = normalizeDate(due_date);
+  const normalizedReceivedDate = normalizeDate(received_date);
+
+  const memoryDateFormatted = normalizedMemoryDate ? formatToMMDDYY(normalizedMemoryDate) : null;
+  const dueDateFormatted = normalizedDueDate ? formatToMMDDYY(normalizedDueDate) : null;
+  const receivedDateFormatted = normalizedReceivedDate ? formatToMMDDYY(normalizedReceivedDate) : null;
+
   const result = await query(
     `INSERT INTO memories 
-      (raw_content, structured_content, category, tags, embedding, source, source_id, memory_date, slack_message_ts)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      (raw_content, structured_content, category, tags, embedding, source, source_id, 
+       memory_date, due_date, received_date,
+       memory_date_formatted, due_date_formatted, received_date_formatted,
+       slack_message_ts)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
      RETURNING *`,
     [
       raw_content,
@@ -34,7 +49,12 @@ export async function createMemory(memoryData) {
       embeddingVector,
       source,
       source_id || null,
-      memory_date || null,
+      normalizedMemoryDate,
+      normalizedDueDate,
+      normalizedReceivedDate,
+      memoryDateFormatted,
+      dueDateFormatted,
+      receivedDateFormatted,
       slack_message_ts || null
     ]
   );
@@ -77,7 +97,10 @@ export async function getMemories(options = {}) {
     limit = 20,
     offset = 0,
     sortBy = 'created_at',
-    sortOrder = 'DESC'
+    sortOrder = 'DESC',
+    dateField = 'memory_date',
+    dateFrom,
+    dateTo
   } = options;
 
   let whereConditions = ['1=1'];
@@ -96,8 +119,21 @@ export async function getMemories(options = {}) {
     paramIndex++;
   }
 
+  // Date range filtering
+  if (dateFrom) {
+    whereConditions.push(`${dateField} >= $${paramIndex}`);
+    params.push(dateFrom);
+    paramIndex++;
+  }
+
+  if (dateTo) {
+    whereConditions.push(`${dateField} <= $${paramIndex}`);
+    params.push(dateTo);
+    paramIndex++;
+  }
+
   // Validate sort parameters to prevent SQL injection
-  const allowedSortFields = ['created_at', 'category', 'raw_content'];
+  const allowedSortFields = ['created_at', 'updated_at', 'category', 'raw_content', 'memory_date', 'due_date', 'received_date'];
   const validSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'created_at';
   const validSortOrder = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
@@ -157,7 +193,7 @@ export async function deleteMemory(id) {
 }
 
 export async function searchMemoriesByVector(queryEmbedding, options = {}) {
-  const { limit = 10, category, tags, threshold = 0.5 } = options;
+  const { limit = 10, category, tags, threshold = 0.5, dateFrom, dateTo, dateField = 'memory_date' } = options;
 
   console.log('[VECTOR searchByVector] Input embedding type:', typeof queryEmbedding, 'isArray:', Array.isArray(queryEmbedding));
   console.log('[VECTOR searchByVector] Options:', options);
@@ -182,6 +218,19 @@ export async function searchMemoriesByVector(queryEmbedding, options = {}) {
   if (tags && tags.length > 0) {
     whereConditions.push(`tags && $${paramIndex}::text[]`);
     params.push(tags);
+    paramIndex++;
+  }
+
+  // Date range filtering
+  if (dateFrom) {
+    whereConditions.push(`${dateField} >= $${paramIndex}`);
+    params.push(dateFrom);
+    paramIndex++;
+  }
+
+  if (dateTo) {
+    whereConditions.push(`${dateField} <= $${paramIndex}`);
+    params.push(dateTo);
     paramIndex++;
   }
 
@@ -318,10 +367,51 @@ function formatMemory(row) {
     tags: row.tags || [],
     embedding: row.embedding,
     source: row.source,
+    sourceId: row.source_id,
     slackMessageTs: row.slack_message_ts,
+    
+    // Date fields (raw timestamps)
+    memoryDate: row.memory_date,
+    dueDate: row.due_date,
+    receivedDate: row.received_date,
+    
+    // Date fields (formatted mm/dd/yy)
+    memoryDateFormatted: row.memory_date_formatted,
+    dueDateFormatted: row.due_date_formatted,
+    receivedDateFormatted: row.received_date_formatted,
+    
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
+}
+
+// Get overdue memories
+export async function getOverdue(limit = 20) {
+  const result = await query(
+    `SELECT * FROM memories 
+     WHERE due_date IS NOT NULL 
+     AND due_date < NOW()
+     ORDER BY due_date ASC
+     LIMIT $1`,
+    [limit]
+  );
+  
+  return result.rows.map(formatMemory);
+}
+
+// Get upcoming memories (due in next 7 days)
+export async function getUpcoming(days = 7, limit = 20) {
+  const result = await query(
+    `SELECT * FROM memories 
+     WHERE due_date IS NOT NULL 
+     AND due_date >= NOW()
+     AND due_date <= NOW() + INTERVAL '${days} days'
+     ORDER BY due_date ASC
+     LIMIT $1`,
+    [limit]
+  );
+  
+  return result.rows.map(formatMemory);
 }
 
 export default {
@@ -335,6 +425,9 @@ export default {
   getCategories,
   getCategoryStats,
   getRecentMemories,
+  getOverdue,
+  getUpcoming,
   bulkClassify,
-  bulkTag
+  bulkTag,
+  findBySourceId
 };

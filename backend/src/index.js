@@ -14,6 +14,9 @@ import authRoutes from './routes/auth.js';
 import categoryRoutes from './routes/categories.js';
 import webhookRoutes from './routes/webhook.js';
 import llmSettingsRoutes from './routes/llmSettings.js';
+import cleanupRoutes from './routes/cleanup.js';
+import analyticsRoutes from './routes/analytics.js';
+import { initializeCleanupCron } from './jobs/cleanupCron.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -82,6 +85,8 @@ app.use('/api/search', apiLimiter, authMiddleware, searchRoutes);
 app.use('/api/chat', apiLimiter, authMiddleware, chatRoutes);
 app.use('/api/categories', apiLimiter, authMiddleware, categoryRoutes);
 app.use('/api/llm-settings', apiLimiter, authMiddleware, llmSettingsRoutes);
+app.use('/api/cleanup', apiLimiter, authMiddleware, cleanupRoutes);
+app.use('/api/analytics', apiLimiter, authMiddleware, analyticsRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -95,7 +100,11 @@ app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`🚀 Second Brain API server running on port ${PORT}`);
   console.log(`📚 API Documentation: http://localhost:${PORT}/api`);
-  console.log(`🔐 Auth required for: /api/memories, /api/search, /api/chat, /api/categories`);
+  console.log(`🔐 Auth required for: /api/memories, /api/search, /api/chat, /api/categories, /api/cleanup, /api/analytics`);
+  
+  // Initialize cleanup cron job
+  initializeCleanupCron();
+  console.log('⏰ Cleanup cron job initialized');
 });
 
 export default app;

@@ -3,13 +3,13 @@ import Anthropic from '@anthropic-ai/sdk';
 import db from '../db/index.js';
 import * as ollamaService from './ollamaService.js';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+const openai = process.env.OPENAI_API_KEY 
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY
-});
+const anthropic = process.env.ANTHROPIC_API_KEY
+  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  : null;
 
 // Classification schema for AI responses
 const CLASSIFICATION_SCHEMA = {

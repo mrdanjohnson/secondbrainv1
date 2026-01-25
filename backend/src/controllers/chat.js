@@ -3,6 +3,7 @@ import * as vectorService from '../services/vectorService.js';
 import { generateChatResponse, generateEmbedding, classifyAndStructure, getUserSettings } from '../services/aiService.js';
 import { asyncHandler, ApiError } from '../middleware/errorHandler.js';
 import { v4 as uuidv4 } from 'uuid';
+import { parseDateQuery, extractDateFromMessage } from '../utils/dateParser.js';
 
 export const chatController = {
   // Send a message and get AI response with context
@@ -163,18 +164,36 @@ export const chatController = {
       const chatSettings = await getUserSettings(userId, 'chat');
       const threshold = chatSettings.relevancyScore || 0.3;
       
-      console.log('[CHAT] Searching for context with:', { message, contextLimit, threshold });
+      // Detect date-related queries
+      const datePhrase = extractDateFromMessage(message);
+      let dateFilter = null;
+      
+      if (datePhrase) {
+        dateFilter = parseDateQuery(datePhrase);
+        console.log('[CHAT] Detected date query:', datePhrase, '→', dateFilter);
+      }
+      
+      console.log('[CHAT] Searching for context with:', { message, contextLimit, threshold, dateFilter });
       
       // Generate embedding once and reuse for fallback search
       const embedding = await generateEmbedding(message);
       
-      contextMemories = await vectorService.searchMemoriesByVector(embedding, {
+      const searchOptions = {
         limit: parseInt(contextLimit),
         threshold
-      });
+      };
+      
+      // Add date filtering if detected
+      if (dateFilter) {
+        searchOptions.dateFrom = dateFilter.startDate;
+        searchOptions.dateTo = dateFilter.endDate;
+        searchOptions.dateField = dateFilter.dateField;
+      }
+      
+      contextMemories = await vectorService.searchMemoriesByVector(embedding, searchOptions);
       
       // If no memories meet the threshold, get at least the 1 closest match using same embedding
-      if (contextMemories.length === 0) {
+      if (contextMemories.length === 0 && !dateFilter) {
         console.log('[CHAT] No memories met threshold, fetching closest match with same embedding');
         contextMemories = await vectorService.searchMemoriesByVector(embedding, {
           limit: 1,
