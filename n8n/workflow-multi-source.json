@@ -1,0 +1,332 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.1.129:3001/api/webhook/generic",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"content\": $json.content,\n  \"source\": $json.source,\n  \"category\": $json.category,\n  \"tags\": $json.tags,\n  \"metadata\": $json.metadata\n} }}",
+        "options": {}
+      },
+      "id": "bcb2b8b3-d0d2-40aa-bb48-d7a838318ffd",
+      "name": "Send to Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -128,
+        -672
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "8PGGMGoQ1NDk1caC",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": 3,
+        "simple": false,
+        "filters": {
+          "labelIds": [
+            "INBOX",
+            "IMPORTANT"
+          ],
+          "sender": "=@newdaychurch.cc"
+        },
+        "options": {}
+      },
+      "name": "Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -560,
+        -1120
+      ],
+      "id": "66025c76-c202-4a7c-8b9f-800b9bbe4784",
+      "webhookId": "50511d04-ce2b-457f-a4b1-15c5e5098426",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "70nR3Ow4axFh7Ffv",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -784,
+        -1168
+      ],
+      "id": "536ce0ef-1406-4ca0-b549-680d644f4630",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {
+          "includeSpamTrash": false,
+          "labelIds": [
+            "INBOX"
+          ]
+        }
+      },
+      "id": "4e6d59ea-fefb-4f1b-9c3e-d375c7178153",
+      "name": "Gmail Trigger1",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        -976,
+        -1168
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "6c4fb21b-eb23-45c7-8529-76ca20ba98b6",
+      "name": "Google Calendar Trigger1",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -768,
+        -768
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "primary",
+          "mode": "list",
+          "cachedResultName": "primary"
+        },
+        "additionalFields": {}
+      },
+      "id": "79fe36ac-a0d8-46cf-97ab-6cf42825ea8a",
+      "name": "Get Calendar Events1",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -768
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Extract Calendar event data\nconst item = $input.item.json;\n\n// Get event details\nconst summary = item.summary || 'Untitled Event';\nconst description = item.description || '';\nconst start = item.start?.dateTime || item.start?.date || '';\nconst end = item.end?.dateTime || item.end?.date || '';\nconst location = item.location || '';\nconst attendees = item.attendees?.map(a => a.email).join(', ') || '';\n\n// Build content string\nlet content = `Meeting: ${summary}\\nTime: ${start}`;\nif (location) content += `\\nLocation: ${location}`;\nif (attendees) content += `\\nAttendees: ${attendees}`;\nif (description) content += `\\n\\nDescription:\\n${description}`;\n\n// Extract tags from event\nconst tags = ['meeting', 'calendar'];\nif (item.organizer?.email) {\n  tags.push('scheduled');\n}\n\nreturn {\n  json: {\n    content: content,\n    source: 'google-calendar',\n    category: 'Meeting',  // You can change this default\n    tags: tags,\n    metadata: {\n      summary: summary,\n      start: start,\n      end: end,\n      location: location,\n      eventId: item.id\n    }\n  }\n};"
+      },
+      "id": "98ebd366-c79c-474b-a9c2-4f08e539a898",
+      "name": "Format Calendar Data1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -368,
+        -768
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "condition1",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c2b71642-eb7a-47a5-a119-73782ea5d330",
+      "name": "Check Success1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        32,
+        -864
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Log successful capture\nconst result = $input.item.json;\n\nconsole.log('✅ Memory captured successfully');\n\nreturn {\n  json: {\n    success: true,\n    message: 'Memory captured successfully'\n  }\n};"
+      },
+      "id": "336564aa-ba04-4d65-a105-0226bc498980",
+      "name": "Log Success1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -928
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Log error\nconst error = $input.item.json;\n\nconsole.error('❌ Failed to capture memory:', error);\n\nreturn {\n  json: {\n    success: false,\n    error: error\n  }\n};"
+      },
+      "id": "d5eb18cf-5c66-4b47-ad42-bc3c13e92306",
+      "name": "Log Error1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -816
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Extract Gmail data\nconst item = $input.item.json;\n\n// Extract subject\nconst subject = item.subject || 'No Subject';\n\n// Extract from using the correct path\nlet from = 'Unknown';\nif (item.from && item.from.value && item.from.value[0] && item.from.value[0].address) {\n  from = item.from.value[0].address;\n  // Also include name if available\n  if (item.from.value[0].name) {\n    from = `${item.from.value[0].name} <${item.from.value[0].address}>`;\n  }\n}\n\n// Get email body\nconst snippet = item.snippet || '';\nconst body = item.text || item.textPlain || item.textHtml || item.snippet || 'No content available';\nconst receivedDate = item.date || new Date().toISOString();\n\n// Build content string\nconst content = `Email from ${from}\\nSubject: ${subject}\\n\\n${body}`;\n\n// Extract potential tags from labels\nconst labels = item.labelIds || [];\nconst tags = labels\n  .filter(l => !['INBOX', 'UNREAD', 'IMPORTANT', 'CATEGORY_PERSONAL', 'STARRED'].includes(l))\n  .map(l => l.toLowerCase().replace(/_/g, '-'));\n\nreturn {\n  json: {\n    content: content,\n    source: 'gmail',\n    category: 'Reference',\n    tags: tags.length > 0 ? tags : ['email'],\n    metadata: {\n      subject: subject,\n      from: from,\n      date: receivedDate,\n      messageId: item.id\n    }\n  }\n};"
+      },
+      "id": "d393c84f-e080-4aa5-81c1-cb20cf82f7ff",
+      "name": "Format Gmail Data4",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -368,
+        -944
+      ]
+    }
+  ],
+  "connections": {
+    "Send to Backend": {
+      "main": [
+        [
+          {
+            "node": "Check Success1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail": {
+      "main": [
+        [
+          {
+            "node": "Format Gmail Data4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger1": {
+      "main": [
+        []
+      ]
+    },
+    "Google Calendar Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Get Calendar Events1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Calendar Events1": {
+      "main": [
+        [
+          {
+            "node": "Format Calendar Data1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Calendar Data1": {
+      "main": [
+        [
+          {
+            "node": "Send to Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Success1": {
+      "main": [
+        [
+          {
+            "node": "Log Success1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Gmail Data4": {
+      "main": [
+        [
+          {
+            "node": "Send to Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "93e6e92b925229ce2add66bd6925d53d336560aceb3f17851986cb143a9a9c82"
+  }
+}
