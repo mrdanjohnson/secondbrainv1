@@ -47,7 +47,18 @@ router.post('/slack', asyncHandler(async (req, res) => {
 
 // Generic webhook for other integrations
 router.post('/generic', asyncHandler(async (req, res) => {
-  const { content, source = 'webhook', source_id, memory_date, due_date, received_date, category, tags, metadata } = req.body;
+  const { 
+    content, 
+    source = 'webhook', 
+    source_id, 
+    // Support both camelCase (from n8n) and snake_case
+    memory_date, memoryDate,
+    due_date, dueDate,
+    received_date, receivedDate,
+    category, 
+    tags, 
+    metadata 
+  } = req.body;
 
   if (!content) {
     throw new ApiError(400, 'Content is required');
@@ -77,9 +88,9 @@ router.post('/generic', asyncHandler(async (req, res) => {
     embedding,
     source,
     source_id,
-    memory_date: memory_date || new Date().toISOString(),
-    due_date,
-    received_date,
+    memory_date: memory_date || memoryDate || new Date().toISOString(),
+    due_date: due_date || dueDate,
+    received_date: received_date || receivedDate,
     slack_message_ts: metadata?.timestamp
   });
 

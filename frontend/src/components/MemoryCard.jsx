@@ -24,6 +24,7 @@ const categoryColors = {
   'Journal': { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' },
   'Meeting': { bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-200' },
   'Learning': { bg: 'bg-cyan-100', text: 'text-cyan-800', border: 'border-cyan-200' },
+  'Email': { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-200' },
   'Unsorted': { bg: 'bg-slate-100', text: 'text-slate-800', border: 'border-slate-200' }
 }
 
@@ -35,6 +36,17 @@ export default function MemoryCard({ memory, onUpdate, compact = false }) {
   const [isExpanded, setIsExpanded] = useState(false)
 
   const colors = categoryColors[memory.category] || categoryColors['Unsorted']
+
+  // Debug: Log memory date fields
+  if (memory.category === 'Task' && !compact) {
+    console.log('MemoryCard date fields:', {
+      id: memory.id,
+      category: memory.category,
+      memoryDateFormatted: memory.memoryDateFormatted,
+      dueDateFormatted: memory.dueDateFormatted,
+      receivedDateFormatted: memory.receivedDateFormatted
+    })
+  }
 
   // Check if due date is overdue
   const isOverdue = memory.dueDate && new Date(memory.dueDate) < new Date()
@@ -89,23 +101,32 @@ export default function MemoryCard({ memory, onUpdate, compact = false }) {
         </div>
         
         {/* Date fields */}
-        <div className="flex items-center gap-3 text-xs text-slate-500 mt-2">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-2">
           {memory.memoryDateFormatted && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1" title="Memory Date">
               <Calendar className="w-3 h-3" />
               <span>{memory.memoryDateFormatted}</span>
             </div>
           )}
           {memory.dueDateFormatted && (
-            <div className={`flex items-center gap-1 ${isOverdue ? 'text-red-600 font-semibold' : ''}`}>
+            <div 
+              className={`flex items-center gap-1 ${isOverdue ? 'text-red-600 font-semibold' : ''}`}
+              title={isOverdue ? 'Overdue' : 'Due Date'}
+            >
               {isOverdue ? <AlertCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
               <span>Due: {memory.dueDateFormatted}</span>
             </div>
           )}
           {memory.receivedDateFormatted && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1" title="Received Date">
               <Inbox className="w-3 h-3" />
-              <span>{memory.receivedDateFormatted}</span>
+              <span>Rcv: {memory.receivedDateFormatted}</span>
+            </div>
+          )}
+          {!memory.memoryDateFormatted && !memory.dueDateFormatted && !memory.receivedDateFormatted && (
+            <div className="flex items-center gap-1" title="Created Date">
+              <Clock className="w-3 h-3" />
+              <span>{format(new Date(memory.createdAt), 'MMM d, yyyy')}</span>
             </div>
           )}
         </div>
@@ -149,29 +170,32 @@ export default function MemoryCard({ memory, onUpdate, compact = false }) {
           </div>
           
           {/* Date fields */}
-          <div className="flex items-center gap-3 text-xs text-slate-500">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
             {memory.memoryDateFormatted && (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1" title="Memory Date">
                 <Calendar className="w-3 h-3" />
                 <span>{memory.memoryDateFormatted}</span>
               </div>
             )}
             {memory.dueDateFormatted && (
-              <div className={`flex items-center gap-1 ${isOverdue ? 'text-red-600 font-semibold' : ''}`}>
+              <div 
+                className={`flex items-center gap-1 ${isOverdue ? 'text-red-600 font-semibold' : ''}`}
+                title={isOverdue ? 'Overdue' : 'Due Date'}
+              >
                 {isOverdue ? <AlertCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
                 <span>Due: {memory.dueDateFormatted}</span>
               </div>
             )}
             {memory.receivedDateFormatted && (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1" title="Received Date">
                 <Inbox className="w-3 h-3" />
-                <span>Received: {memory.receivedDateFormatted}</span>
+                <span>Rcv: {memory.receivedDateFormatted}</span>
               </div>
             )}
             {!memory.memoryDateFormatted && !memory.dueDateFormatted && !memory.receivedDateFormatted && (
-              <div className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                {format(new Date(memory.createdAt), 'MMM d, yyyy')}
+              <div className="flex items-center gap-1" title="Created Date">
+                <Clock className="w-3 h-3" />
+                <span>Created: {format(new Date(memory.createdAt), 'MMM d, yyyy')}</span>
               </div>
             )}
           </div>
