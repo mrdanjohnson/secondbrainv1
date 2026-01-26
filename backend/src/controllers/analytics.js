@@ -172,8 +172,27 @@ export const analyticsController = {
 
   // Get summary statistics
   getSummaryStats: asyncHandler(async (req, res) => {
+    // Total Memories
     const totalResult = await query('SELECT COUNT(*) as total FROM memories', []);
+    const totalMemories = parseInt(totalResult.rows[0].total);
+    
+    // Category Stats (with breakdown)
     const categoryStats = await vectorService.getCategoryStats();
+    
+    // Get first memory date for avg calculation
+    const firstMemoryResult = await query(
+      `SELECT MIN(created_at) as first_memory FROM memories`,
+      []
+    );
+    
+    // Calculate avg per day
+    let avgPerDay = 0;
+    if (firstMemoryResult.rows[0].first_memory && totalMemories > 0) {
+      const firstMemoryDate = new Date(firstMemoryResult.rows[0].first_memory);
+      const now = new Date();
+      const daysSinceFirst = Math.max(1, Math.ceil((now - firstMemoryDate) / (1000 * 60 * 60 * 24)));
+      avgPerDay = totalMemories / daysSinceFirst;
+    }
     
     const todayResult = await query(
       `SELECT COUNT(*) as today FROM memories WHERE DATE(created_at) = CURRENT_DATE`,
@@ -186,9 +205,10 @@ export const analyticsController = {
       []
     );
     
-    const thisMonthResult = await query(
-      `SELECT COUNT(*) as month FROM memories 
-       WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)`,
+    // Last 30 days count
+    const last30DaysResult = await query(
+      `SELECT COUNT(*) as count FROM memories 
+       WHERE created_at >= NOW() - INTERVAL '30 days'`,
       []
     );
     
@@ -201,12 +221,16 @@ export const analyticsController = {
     res.json({
       success: true,
       data: {
-        total: parseInt(totalResult.rows[0].total),
+        totalMemories,
+        avgPerDay: parseFloat(avgPerDay.toFixed(1)),
+        thisMonth: parseInt(last30DaysResult.rows[0].count),
         today: parseInt(todayResult.rows[0].today),
         thisWeek: parseInt(thisWeekResult.rows[0].week),
-        thisMonth: parseInt(thisMonthResult.rows[0].month),
         overdue: parseInt(overdueCount.rows[0].overdue),
-        byCategory: categoryStats
+        byCategory: categoryStats.map(cat => ({
+          category: cat.category,
+          count: parseInt(cat.count)
+        }))
       }
     });
   })

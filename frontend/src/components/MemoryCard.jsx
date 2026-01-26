@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
+import ReactMarkdown from 'react-markdown'
 import { memoriesApi } from '../services/api'
 import {
   Tag,
@@ -84,13 +85,30 @@ export default function MemoryCard({ memory, onUpdate, compact = false }) {
               <span className={`tag ${colors.bg} ${colors.text}`}>
                 {memory.category}
               </span>
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="p-1 hover:bg-slate-100 rounded transition-colors"
+                title={isExpanded ? 'Collapse' : 'Expand'}
+              >
+                {isExpanded ? (
+                  <ChevronUp className="w-4 h-4 text-slate-500" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-slate-500" />
+                )}
+              </button>
               <span className="text-xs text-slate-400">
                 {format(new Date(memory.createdAt), 'MMM d')}
               </span>
             </div>
-            <p className="text-slate-700 line-clamp-2 text-sm">
-              {memory.rawContent}
-            </p>
+            {!isExpanded ? (
+              <p className="text-slate-700 line-clamp-2 text-sm">
+                {memory.rawContent}
+              </p>
+            ) : (
+              <div className="prose prose-sm max-w-none">
+                <ReactMarkdown>{memory.rawContent}</ReactMarkdown>
+              </div>
+            )}
           </div>
           <button
             onClick={() => setShowMenu(!showMenu)}
@@ -273,9 +291,9 @@ export default function MemoryCard({ memory, onUpdate, compact = false }) {
               </div>
             </div>
           ) : (
-            <p className="text-slate-700 whitespace-pre-wrap">
-              {memory.rawContent}
-            </p>
+            <div className="prose prose-sm max-w-none">
+              <ReactMarkdown>{memory.rawContent}</ReactMarkdown>
+            </div>
           )}
 
           {/* Structured content preview */}

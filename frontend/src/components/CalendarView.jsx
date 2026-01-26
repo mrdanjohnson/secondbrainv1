@@ -39,41 +39,19 @@ export default function CalendarView() {
     queryFn: () => memoriesApi.getAll({ limit: 1000 }).then(res => res.data.data)
   })
 
-  // Transform memories into calendar events
+  // Transform memories into calendar events - only show tasks with due dates
   const events = useMemo(() => {
     const eventsList = []
     
     memories.forEach(memory => {
-      // Add event for memory_date
-      if (memory.memoryDate) {
-        eventsList.push({
-          id: `${memory.id}-memory`,
-          title: memory.rawContent.substring(0, 50) + (memory.rawContent.length > 50 ? '...' : ''),
-          start: new Date(memory.memoryDate),
-          end: new Date(memory.memoryDate),
-          resource: { memory, type: 'memory' }
-        })
-      }
-      
-      // Add event for due_date
+      // Only add tasks that have a due_date
       if (memory.dueDate) {
         eventsList.push({
           id: `${memory.id}-due`,
-          title: `📌 ${memory.rawContent.substring(0, 40)}${memory.rawContent.length > 40 ? '...' : ''}`,
+          title: `${memory.rawContent.substring(0, 50)}${memory.rawContent.length > 50 ? '...' : ''}`,
           start: new Date(memory.dueDate),
           end: new Date(memory.dueDate),
           resource: { memory, type: 'due' }
-        })
-      }
-      
-      // Add event for received_date
-      if (memory.receivedDate) {
-        eventsList.push({
-          id: `${memory.id}-received`,
-          title: `📥 ${memory.rawContent.substring(0, 40)}${memory.rawContent.length > 40 ? '...' : ''}`,
-          start: new Date(memory.receivedDate),
-          end: new Date(memory.receivedDate),
-          resource: { memory, type: 'received' }
         })
       }
     })
@@ -85,17 +63,10 @@ export default function CalendarView() {
     const category = event.resource.memory.category
     const backgroundColor = categoryColors[category] || categoryColors['Unsorted']
     
-    let opacity = '0.8'
-    if (event.resource.type === 'due') {
-      opacity = '0.95'
-    } else if (event.resource.type === 'received') {
-      opacity = '0.7'
-    }
-    
     return {
       style: {
         backgroundColor,
-        opacity,
+        opacity: '0.9',
         borderRadius: '4px',
         border: 'none',
         color: 'white',
