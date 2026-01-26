@@ -95,11 +95,6 @@ export async function getUserSettings(userId, area) {
           temperature: parseFloat(settings.classification_temperature),
           maxTokens: settings.classification_max_tokens
         };
-      case 'embedding':
-        return {
-          provider: settings.embedding_provider,
-          model: settings.embedding_model
-        };
       default:
         return getDefaultSettings(area);
     }
@@ -133,30 +128,38 @@ function getDefaultSettings(area) {
       model: 'gpt-4o',
       temperature: 0.3,
       maxTokens: 512
-    },
-    embedding: {
-      provider: 'openai',
-      model: 'text-embedding-3-small'
     }
   };
 
   return defaults[area] || defaults.chat;
 }
 
-export async function generateEmbedding(text, userId = null) {
+/**
+ * Generate embedding using global system-wide embedding model
+ * 
+ * NOTE: Embedding model must be consistent across all memories for vector similarity to work.
+ * This is configured via environment variables:
+ * - EMBEDDING_PROVIDER: 'openai' or 'ollama' (default: 'openai')
+ * - EMBEDDING_MODEL: model name (default: 'text-embedding-3-small')
+ * 
+ * Changing these requires re-embedding all existing memories.
+ */
+export async function generateEmbedding(text) {
   try {
-    // Get user settings if userId provided
-    const settings = userId 
-      ? await getUserSettings(userId, 'embedding')
-      : getDefaultSettings('embedding');
+    const provider = process.env.EMBEDDING_PROVIDER || 'openai';
+    const model = process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
 
-    if (settings.provider === 'ollama') {
-      return await ollamaService.generateOllamaEmbedding(text, settings.model);
+    if (provider === 'ollama') {
+      return await ollamaService.generateOllamaEmbedding(text, model);
     }
 
     // OpenAI (default)
+    if (!openai) {
+      throw new Error('OpenAI API key not configured');
+    }
+
     const response = await openai.embeddings.create({
-      model: settings.model,
+      model,
       input: text.slice(0, 8000),
       dimensions: 1536
     });

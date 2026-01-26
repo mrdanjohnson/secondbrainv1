@@ -53,10 +53,6 @@ export const getLLMSettings = asyncHandler(async (req, res) => {
         model: settings.classification_model,
         temperature: parseFloat(settings.classification_temperature),
         maxTokens: settings.classification_max_tokens
-      },
-      embedding: {
-        provider: settings.embedding_provider,
-        model: settings.embedding_model
       }
     }
   });
@@ -67,7 +63,7 @@ export const getLLMSettings = asyncHandler(async (req, res) => {
  */
 export const updateLLMSettings = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  const { chat, search, classification, embedding } = req.body;
+  const { chat, search, classification } = req.body;
 
   console.log('[LLM Settings Update] Request body:', JSON.stringify(req.body, null, 2));
 
@@ -143,17 +139,6 @@ export const updateLLMSettings = asyncHandler(async (req, res) => {
     }
   }
 
-  if (embedding) {
-    if (embedding.provider) {
-      updates.push(`embedding_provider = $${paramCount++}`);
-      values.push(embedding.provider);
-    }
-    if (embedding.model) {
-      updates.push(`embedding_model = $${paramCount++}`);
-      values.push(embedding.model);
-    }
-  }
-
   if (updates.length === 0) {
     return res.status(400).json({
       success: false,
@@ -207,10 +192,6 @@ export const updateLLMSettings = asyncHandler(async (req, res) => {
         model: settings.classification_model,
         temperature: parseFloat(settings.classification_temperature),
         maxTokens: settings.classification_max_tokens
-      },
-      embedding: {
-        provider: settings.embedding_provider,
-        model: settings.embedding_model
       }
     }
   });

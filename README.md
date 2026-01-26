@@ -52,6 +52,10 @@ N8N_PASSWORD=your_secure_n8n_password
 OPENAI_API_KEY=sk-your-openai-key
 ANTHROPIC_API_KEY=your-anthropic-key  # Optional: for Claude support
 
+# Vector Embeddings (System-Wide)
+EMBEDDING_PROVIDER=openai              # Options: 'openai' or 'ollama'
+EMBEDDING_MODEL=text-embedding-3-small # Must be consistent for all memories
+
 # Security
 JWT_SECRET=your-super-secret-jwt-key
 

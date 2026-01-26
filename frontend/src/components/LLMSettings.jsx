@@ -61,10 +61,6 @@ export default function LLMSettings() {
       model: 'gpt-4o',
       temperature: 0.3,
       maxTokens: 512
-    },
-    embedding: {
-      provider: 'openai',
-      model: 'text-embedding-3-small'
     }
   })
 
@@ -323,7 +319,7 @@ export default function LLMSettings() {
       <AreaSettings
         area="search"
         title="Semantic Search"
-        description="Settings for AI-powered search and memory retrieval"
+        description="Relevancy threshold for filtering search results (embeddings configured system-wide)"
         settings={settings.search}
         expanded={expandedAreas.search}
         onToggle={() => toggleArea('search')}
@@ -331,6 +327,7 @@ export default function LLMSettings() {
         getModels={getModelsForProvider}
         recommended={recommendedSettings.search}
         showRelevancy={true}
+        hideModelSelection={true}
       />
 
       {/* Classification Settings */}
@@ -347,52 +344,25 @@ export default function LLMSettings() {
         showRelevancy={false}
       />
 
-      {/* Embedding Settings */}
-      <div className="memory-card p-6 space-y-4">
-        <div 
-          className="flex items-center justify-between cursor-pointer"
-          onClick={() => toggleArea('embedding')}
-        >
-          <div className="flex items-center gap-3">
-            <Cpu className="w-5 h-5 text-primary-600" />
-            <div>
-              <h3 className="text-lg font-semibold text-slate-800">Vector Embeddings</h3>
-              <p className="text-sm text-slate-500">Settings for generating text embeddings</p>
-            </div>
+      {/* Vector Embeddings Info */}
+      <div className="memory-card p-6 space-y-4 bg-slate-50 border-slate-200">
+        <div className="flex items-start gap-3">
+          <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-lg font-semibold text-slate-800">Vector Embeddings</h3>
+            <p className="text-sm text-slate-600 mt-1">
+              Embedding model is configured system-wide via environment variables:
+            </p>
+            <ul className="text-sm text-slate-600 mt-2 space-y-1 list-disc list-inside">
+              <li><code className="bg-slate-200 px-1 rounded">EMBEDDING_PROVIDER</code> (openai or ollama)</li>
+              <li><code className="bg-slate-200 px-1 rounded">EMBEDDING_MODEL</code> (e.g., text-embedding-3-small)</li>
+            </ul>
+            <p className="text-xs text-slate-500 mt-3 italic">
+              Note: All memories must use the same embedding model for similarity search to work. 
+              Changing this requires re-embedding all existing memories.
+            </p>
           </div>
-          {expandedAreas.embedding ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
         </div>
-
-        {expandedAreas.embedding && (
-          <div className="space-y-4 pt-4 border-t border-slate-200">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Provider</label>
-              <select
-                value={settings.embedding.provider}
-                onChange={(e) => handleAreaChange('embedding', 'provider', e.target.value)}
-                className="input-field"
-              >
-                <option value="openai">OpenAI</option>
-                <option value="ollama">Ollama (Local)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Model</label>
-              <select
-                value={settings.embedding.model}
-                onChange={(e) => handleAreaChange('embedding', 'model', e.target.value)}
-                className="input-field"
-              >
-                {getModelsForProvider(settings.embedding.provider, 'embeddings').map(model => (
-                  <option key={model.id} value={model.id}>
-                    {model.name} - {model.description}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Ollama Management */}
@@ -520,7 +490,8 @@ function AreaSettings({
   onChange, 
   getModels,
   recommended,
-  showRelevancy 
+  showRelevancy,
+  hideModelSelection = false
 }) {
   return (
     <div className="memory-card p-6 space-y-4">
@@ -540,35 +511,39 @@ function AreaSettings({
 
       {expanded && (
         <div className="space-y-4 pt-4 border-t border-slate-200">
-          {/* Provider Selection */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Provider</label>
-            <select
-              value={settings.provider}
-              onChange={(e) => onChange('provider', e.target.value)}
-              className="input-field"
-            >
-              <option value="openai">OpenAI</option>
-              <option value="anthropic">Anthropic (Claude)</option>
-              <option value="ollama">Ollama (Local)</option>
-            </select>
-          </div>
+          {!hideModelSelection && (
+            <>
+              {/* Provider Selection */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Provider</label>
+                <select
+                  value={settings.provider}
+                  onChange={(e) => onChange('provider', e.target.value)}
+                  className="input-field"
+                >
+                  <option value="openai">OpenAI</option>
+                  <option value="anthropic">Anthropic (Claude)</option>
+                  <option value="ollama">Ollama (Local)</option>
+                </select>
+              </div>
 
-          {/* Model Selection */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Model</label>
-            <select
-              value={settings.model}
-              onChange={(e) => onChange('model', e.target.value)}
-              className="input-field"
-            >
-              {getModels(settings.provider).map(model => (
-                <option key={model.id} value={model.id}>
-                  {model.name} - {model.description}
-                </option>
-              ))}
-            </select>
-          </div>
+              {/* Model Selection */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Model</label>
+                <select
+                  value={settings.model}
+                  onChange={(e) => onChange('model', e.target.value)}
+                  className="input-field"
+                >
+                  {getModels(settings.provider).map(model => (
+                    <option key={model.id} value={model.id}>
+                      {model.name} - {model.description}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
 
           {/* Temperature Slider */}
           <div>
