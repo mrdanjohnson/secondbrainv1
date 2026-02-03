@@ -13,6 +13,8 @@ Controllers → Services → External APIs / Database
     │            │
     │            ├── aiService (OpenAI, Anthropic, Ollama)
     │            ├── vectorService (pgvector operations)
+    │            ├── queryAnalyzer (extract filters from natural language)
+    │            ├── smartSearch (multi-stage priority filtering)
     │            └── ollamaService (Local LLM management)
     │
     └── Direct DB calls for simple CRUD
@@ -463,7 +465,125 @@ describe('AI Service', () => {
 
 ---
 
-**Last Updated**: 2026-01-24  
-**Services**: 3 (aiService, vectorService, ollamaService)  
-**Providers**: OpenAI, Anthropic, Ollama  
+**Last Updated**: 2026-01-26  
+**Services**: 5 (aiService, vectorService, ollamaService, queryAnalyzer, smartSearch)  
+**Providers**: OpenAI, Anthropic, Ollama
+
+---
+
+## Query Analyzer Service
+
+**File**: `backend/src/services/queryAnalyzer.js`
+
+### Purpose
+- Extract structured filters from natural language queries
+- Detect categories, tags, and dates in user queries
+- Support synonym mapping for common variations
+- Clean query text for better embedding generation
+
+### Key Functions
+
+#### `analyzeQuery(userQuery)`
+**Purpose**: Parse natural language query and extract structured filters
+
+**Returns**:
+```javascript
+{
+  originalQuery: "work tasks from yesterday",
+  cleanedQuery: "from",  // With categories/tags/dates removed
+  filters: {
+    datePhrase: "yesterday",
+    categories: ["work"],
+    tags: ["tasks"],
+    exactMatches: {
+      category: "work",
+      tags: ["tasks"]
+    }
+  },
+  searchType: "hybrid"  // "semantic" | "filtered" | "hybrid"
+}
+```
+
+**Synonym Support**:
+- Categories: "meetings" → "meeting", "events" → "meeting", "todos" → "task"
+- Tags: "important" → "priority", "urgent", "critical"
+
+**Example**:
+```javascript
+const analysis = await analyzeQuery("show me urgent meetings from yesterday");
+// Extracts: date="yesterday", category="meeting", tags=["urgent"]
+```
+
+---
+
+## Smart Search Service
+
+**File**: `backend/src/services/smartSearch.js`
+
+### Purpose
+- Multi-stage search with priority filtering
+- Intelligent score boosting for exact matches
+- Combine structured filters with semantic similarity
+- Provide search insights and metadata
+
+### Key Functions
+
+#### `smartSearch(userQuery, options)`
+**Purpose**: Execute intelligent search with 4-stage priority filtering
+
+**Options**:
+```javascript
+{
+  limit: 20,        // Max results
+  userId: "uuid",   // User ID for filtering
+  threshold: 0.5    // Min similarity (ignored for exact matches)
+}
+```
+
+**Returns**:
+```javascript
+{
+  results: [
+    {
+      id: "uuid",
+      content: "...",
+      category: "work",
+      similarity: 0.85,
+      final_score: 5.35,  // similarity + category_boost + tag_boost
+      match_type: "date+category+tag+semantic"
+    }
+  ],
+  analysis: { /* query analysis */ },
+  metadata: {
+    dateFiltered: true,
+    categoryFiltered: true,
+    tagFiltered: true,
+    totalMatches: 5
+  }
+}
+```
+
+**Priority Filtering**:
+1. **Date** (highest): Filter by memory_date/due_date/received_date
+2. **Category**: Exact match, +3.0 score boost
+3. **Tag**: Contains match, +1.5 per tag boost
+4. **Vector**: Semantic similarity (0.0-1.0)
+
+**Score Calculation**:
+```
+final_score = similarity + category_boost + tag_boost
+Example: 0.85 + 3.0 + 1.5 = 5.35 (535%)
+```
+
+**Example**:
+```javascript
+const result = await smartSearch("work tasks due tomorrow", {
+  limit: 10,
+  userId: "uuid",
+  threshold: 0.3
+});
+// Applies: date filter (tomorrow), category filter (work), tag filter (tasks)
+```
+
+---
 **Key Operations**: Embeddings, Classification, RAG Chat

@@ -320,31 +320,77 @@ function SettingsPage() {
 
 ### **Search**
 **File**: `src/pages/Search.jsx`
-**Purpose**: Semantic and text search
+**Purpose**: Smart semantic search with priority filtering
 
 **Features**:
-- Search input with debounce (300ms)
-- Search type toggle:
-  - Semantic (vector similarity)
-  - Text (keyword search)
-- Result cards with similarity scores
-- Filter by category
-- Sort by similarity/relevance
-- No results state
-- **Natural language date filters** (NEW v1.2.0):
+- Search input with auto-focus
+- Example queries (click to search)
+- Result cards with composite match scores
+- **Smart Search Insights** (NEW v2.0.0):
+  - Visual panel showing applied filters
+  - Badge indicators: 📅 Date, 📁 Category, 🏷️ Tag, ⚡ Vector
+  - Explanatory text of search strategy
+- **Match Type Badges** (NEW v2.0.0):
+  - Each result shows match type breakdown
+  - Color-coded badges for Date, Category, Tag, Semantic matches
+  - Composite scores (e.g., "535% match")
+- **Natural language date filters** (v1.2.0):
   - Expandable date filter section
   - Quick presets: Today, Yesterday, Last Week, Last Month, Last 3 Days, This Week
   - Custom text input for natural language queries
   - Date field selector (memory_date, due_date, received_date)
   - Active filter indicator with clear button
+- No results state with helpful message
+- Loading state with spinner
+
+**Search Intelligence** (NEW v2.0.0):
+- Automatic category detection from query
+- Automatic tag detection from query
+- Automatic date extraction ("yesterday", "this monday", "in 3 days")
+- Synonym support (meetings→meeting, events→meeting, todos→task)
+- Priority filtering: Date → Category → Tag → Vector
+- Score boosting: Category +3.0, Tags +1.5 each
 
 **Search Flow**:
-1. User types query
-2. (Optional) User adds date filter
-3. Debounce 300ms
-4. Call `/api/search/semantic` with dateQuery and dateField params
-5. Display results with scores
-6. Click to view full memory
+1. User types query (e.g., "work tasks from yesterday")
+2. System analyzes query:
+   - Extracts "yesterday" → date filter
+   - Detects "work" → category filter
+   - Detects "tasks" → tag filter
+3. Calls `/api/search/semantic` with natural language query
+4. Backend returns results with match types and composite scores
+5. UI displays:
+   - Search insights panel with active filters
+   - Results with match badges and scores
+   - Click to view full memory
+
+**Example Queries**:
+- "work tasks from yesterday" → Date + Category + Tag + Semantic
+- "What are my project ideas?" → Category + Semantic
+- "tasks due in 3 days" → Date range + Semantic
+- "meetings from this monday" → Weekday + Category + Semantic
+
+**State Management**:
+```typescript
+const [query, setQuery] = useState('')
+const [results, setResults] = useState([])
+const [searchMetadata, setSearchMetadata] = useState(null)  // NEW v2.0.0
+const [dateFilter, setDateFilter] = useState('')
+const [dateField, setDateField] = useState('memory_date')
+```
+
+**API Response Handling** (v2.0.0):
+```javascript
+// Old response structure
+{ results: [...], query: "...", count: 5 }
+
+// New response structure
+{
+  results: [{ final_score, match_type, ... }],
+  analysis: { originalQuery, cleanedQuery, filters },
+  metadata: { dateFiltered, categoryFiltered, tagFiltered }
+}
+```
 
 ---
 

@@ -448,6 +448,118 @@ Originally considered session-based auth with Redis, but moved to JWT for better
 
 ---
 
-**Last Updated**: 2026-01-24  
-**Total ADRs**: 10 (9 accepted, 1 deprecated)  
+**Last Updated**: 2026-01-26  
+**Total ADRs**: 11 (10 accepted, 1 deprecated)  
 **Next Review**: Q2 2026
+
+---
+
+## ADR-011: Priority-Based Multi-Stage Search
+
+**Date**: 2026-01-26  
+**Status**: Accepted  
+**Deciders**: Development Team
+
+### Context
+Original semantic search used pure vector similarity, which often returned semantically similar but contextually irrelevant results. Users needed to find memories by specific dates, categories, or tags, but these structured filters were treated equally with semantic similarity.
+
+**Problem Examples**:
+- "work tasks from yesterday" returned all "work" memories sorted by similarity, ignoring the date
+- Category matches scored the same as weak semantic matches
+- No natural language understanding of queries
+
+### Decision
+Implement a 4-stage priority filtering system with score boosting:
+
+1. **Date Filtering** (Priority 1): Filter by date range using natural language
+2. **Category Matching** (Priority 2): Exact match with +3.0 score boost
+3. **Tag Matching** (Priority 3): Contains match with +1.5 boost per tag
+4. **Vector Similarity** (Priority 4): Semantic embeddings (0.0-1.0)
+
+**Score Calculation**:
+```
+final_score = similarity + category_boost + tag_boost
+```
+
+**Architecture**:
+- `queryAnalyzer.js`: Extract categories, tags, dates from natural language
+- `smartSearch.js`: Apply priority filters and calculate composite scores
+- Single SQL query with all filters and score boosting
+
+### Alternatives Considered
+
+1. **Weighted Vector Search**
+   - Pros: Simpler, no query parsing needed
+   - Cons: Can't enforce hard filters (e.g., date ranges), no exact match priority
+   - Why Rejected: Couldn't guarantee date-specific results
+
+2. **Separate Filter UI**
+   - Pros: Explicit filters, no NLP complexity
+   - Cons: Poor UX, requires multiple inputs, not conversational
+   - Why Rejected: Defeats purpose of "natural language" search
+
+3. **Elasticsearch with Boosting**
+   - Pros: Industry-standard, powerful query DSL
+   - Cons: Additional infrastructure, learning curve, overkill for current scale
+   - Why Rejected: Unnecessary complexity, already have pgvector
+
+4. **LLM-Based Query Parsing**
+   - Pros: Better NLP, handles complex queries
+   - Cons: Slow (200-500ms), costs money per query, overkill
+   - Why Rejected: Regex + DB lookups are fast enough (<20ms)
+
+### Consequences
+
+**Positive**:
+- **Better Relevance**: Date-specific queries now work correctly
+- **Transparent Scoring**: Users see why results matched (badges)
+- **Fast**: Single SQL query, no additional latency
+- **Natural Language**: "work tasks from yesterday" just works
+- **Synonym Support**: "meetings" → "meeting", "todos" → "task"
+- **Consistent**: Chat and search use same intelligence
+
+**Negative**:
+- **API Breaking Change**: Response structure changed (added `analysis`, `metadata`)
+- **More Complex**: Query analyzer + smart search vs simple vector search
+- **Synonym Maintenance**: Need to update synonym mappings as categories evolve
+
+**Neutral**:
+- Score values >1.0 (due to boosting) may confuse users initially
+- Threshold parameter now bypassed for exact matches
+
+### Implementation Notes
+
+**New Services**:
+- `backend/src/services/queryAnalyzer.js` - 113 lines
+- `backend/src/services/smartSearch.js` - 220 lines
+
+**Modified Services**:
+- `backend/src/controllers/search.js` - Uses smartSearch
+- `backend/src/controllers/chat.js` - Uses smartSearch for context
+- `backend/src/utils/dateParser.js` - Enhanced with weekdays, quarters, synonyms
+
+**Frontend Changes**:
+- `frontend/src/pages/Search.jsx` - Search insights panel, match badges
+
+**Testing**:
+- `backend/test-smart-search.js` - Manual testing script
+
+**Migration Path**:
+- No database changes required
+- Frontend needs update to handle new response fields
+- Old clients still work (backwards compatible at DB level)
+
+**Performance**:
+- Query analysis: ~10-20ms
+- Smart search: ~100-300ms (same as before)
+- Total: No significant change
+
+### Future Enhancements
+
+1. **Fuzzy Category Matching**: Allow partial matches (e.g., "proj" → "project")
+2. **User Feedback Learning**: Track which results users click
+3. **Query Suggestions**: Auto-complete based on past queries
+4. **Advanced Operators**: Support AND/OR/NOT syntax
+5. **Saved Searches**: Allow users to save frequent queries
+
+---

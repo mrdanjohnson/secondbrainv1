@@ -3,11 +3,32 @@
  * Parses human-friendly date queries into date ranges
  */
 
-import { getStartOfDay, getEndOfDay } from './dateUtils.js';
+/**
+ * Set to start of day (00:00:00)
+ */
+function getStartOfDay(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/**
+ * Set to end of day (23:59:59)
+ */
+function getEndOfDay(date) {
+  const d = new Date(date);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+export { getStartOfDay, getEndOfDay };
 
 /**
  * Parse natural language date queries into date ranges
  * Returns { startDate, endDate, dateField }
+ * 
+ * Note: dateField returns the base field name (e.g., 'due_date')
+ * The calling code will append '_formatted' for SQL queries (e.g., 'due_date_formatted')
  */
 export function parseDateQuery(query, context = {}) {
   const queryLower = query.toLowerCase().trim();
@@ -16,12 +37,91 @@ export function parseDateQuery(query, context = {}) {
   let startDate, endDate, dateField = context.defaultField || 'memory_date';
   
   // Detect field from context keywords
+  // These base field names will be appended with '_formatted' in SQL queries
   if (queryLower.includes('due') || queryLower.includes('deadline')) {
-    dateField = 'due_date';
-  } else if (queryLower.includes('received') || queryLower.includes('got') || queryLower.includes('email')) {
-    dateField = 'received_date';
+    dateField = 'due_date'; // → due_date_formatted in SQL
+  } else if (queryLower.includes('received') || queryLower.includes('got') || queryLower.includes('email') || queryLower.includes('sent')) {
+    dateField = 'received_date'; // → received_date_formatted in SQL
+  } else if (queryLower.includes('from') || queryLower.includes('on') || queryLower.includes('occurred')) {
+    dateField = 'memory_date'; // → memory_date_formatted in SQL
   }
   
+  // Specific weekdays (this monday, next tuesday, last friday)
+  const weekdayMatch = queryLower.match(/(this|next|last)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i);
+  if (weekdayMatch) {
+    const [_, modifier, weekday] = weekdayMatch;
+    const targetDay = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].indexOf(weekday.toLowerCase());
+    const currentDay = now.getDay();
+    
+    let targetDate = new Date(now);
+    
+    if (modifier === 'this') {
+      // Get the next occurrence of this weekday (could be today)
+      const daysUntil = (targetDay - currentDay + 7) % 7;
+      targetDate.setDate(targetDate.getDate() + daysUntil);
+    } else if (modifier === 'next') {
+      // Get the weekday in next week
+      const daysUntil = (targetDay - currentDay + 7) % 7 || 7;
+      targetDate.setDate(targetDate.getDate() + daysUntil);
+    } else if (modifier === 'last') {
+      // Get the most recent occurrence of this weekday
+      const daysSince = (currentDay - targetDay + 7) % 7 || 7;
+      targetDate.setDate(targetDate.getDate() - daysSince);
+    }
+    
+    startDate = getStartOfDay(targetDate);
+    endDate = getEndOfDay(targetDate);
+  }
+  // "In X days/weeks" (future dates) - range from now to future date
+  else if (queryLower.match(/in\s+(\d+)\s+(day|days|week|weeks|month|months)/)) {
+    const match = queryLower.match(/in\s+(\d+)\s+(day|days|week|weeks|month|months)/);
+    const amount = parseInt(match[1]);
+    const unit = match[2].toLowerCase();
+    
+    const future = new Date(now);
+    if (unit.includes('day')) {
+      future.setDate(future.getDate() + amount);
+    } else if (unit.includes('week')) {
+      future.setDate(future.getDate() + (amount * 7));
+    } else if (unit.includes('month')) {
+      future.setMonth(future.getMonth() + amount);
+    }
+    
+    startDate = getStartOfDay(now);
+    endDate = getEndOfDay(future);
+    dateField = 'due_date'; // "in X days" implies due date context
+  }
+  // Quarter references (Q1 2026, Q2 2026, etc.)
+  else if (queryLower.match(/q([1-4])\s+(\d{4})/)) {
+    const match = queryLower.match(/q([1-4])\s+(\d{4})/);
+    const quarter = parseInt(match[1]);
+    const year = parseInt(match[2]);
+    
+    const quarterStarts = {
+      1: [0, 2],  // Jan-Mar
+      2: [3, 5],  // Apr-Jun
+      3: [6, 8],  // Jul-Sep
+      4: [9, 11]  // Oct-Dec
+    };
+    
+    const [startMonth, endMonth] = quarterStarts[quarter];
+    startDate = new Date(year, startMonth, 1, 0, 0, 0, 0);
+    endDate = new Date(year, endMonth + 1, 0, 23, 59, 59, 999); // Last day of quarter
+  }
+  // "This quarter"
+  else if (queryLower.includes('this quarter')) {
+    const currentMonth = now.getMonth();
+    const currentQuarter = Math.floor(currentMonth / 3) + 1;
+    const quarterStarts = {
+      1: [0, 2],
+      2: [3, 5],
+      3: [6, 8],
+      4: [9, 11]
+    };
+    const [startMonth, endMonth] = quarterStarts[currentQuarter];
+    startDate = new Date(now.getFullYear(), startMonth, 1, 0, 0, 0, 0);
+    endDate = getEndOfDay(now); // Up to today
+  }
   // Yesterday
   if (queryLower.includes('yesterday')) {
     const yesterday = new Date(now);
@@ -98,12 +198,13 @@ export function parseDateQuery(query, context = {}) {
   else if (queryLower.includes('overdue')) {
     startDate = new Date('1970-01-01');
     endDate = new Date(now);
-    dateField = 'due_date';
+    dateField = 'due_date'; // → due_date_formatted in SQL
   }
   else {
     return null; // Couldn't parse
   }
   
+  // Return base field names - calling code will append '_formatted' for SQL
   return { startDate, endDate, dateField };
 }
 
@@ -113,6 +214,7 @@ export function parseDateQuery(query, context = {}) {
  */
 export function extractDateFromMessage(message) {
   const patterns = [
+    /in\s+\d+\s+(day|days|week|weeks|month|months)/i,
     /yesterday/i,
     /today/i,
     /tomorrow/i,

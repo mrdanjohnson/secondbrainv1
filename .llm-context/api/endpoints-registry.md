@@ -457,7 +457,7 @@ Authorization: Bearer <token>
 
 ## Search Endpoints
 
-### Semantic Search
+### Semantic Search (Smart Search with Priority Filtering)
 ```
 POST /api/search/semantic
 ```
@@ -467,32 +467,77 @@ POST /api/search/semantic
 Authorization: Bearer <token>
 ```
 
+**Description**: Intelligent multi-stage search that extracts categories, tags, and dates from natural language queries. Uses 4-stage priority filtering: Date → Category → Tag → Vector Embeddings.
+
 **Request Body**:
 ```json
 {
-  "query": "ideas about AI and productivity",
+  "query": "work tasks from yesterday",
   "limit": 20,
-  "threshold": 0.3  // Minimum similarity score (0-1)
+  "threshold": 0.5  // Minimum similarity score (0-1), ignored for exact category/tag matches
 }
 ```
 
 **Response** `200 OK`:
 ```json
 {
-  "results": [
-    {
-      "id": "uuid",
-      "raw_content": "...",
-      "category": "Idea",
-      "tags": ["ai", "productivity"],
-      "similarity": 0.89,
-      "created_at": "..."
+  "success": true,
+  "data": {
+    "query": "work tasks from yesterday",
+    "results": [
+      {
+        "id": "uuid",
+        "raw_content": "Complete project presentation",
+        "category": "work",
+        "tags": ["tasks", "urgent"],
+        "memory_date": "2026-01-25T14:30:00Z",
+        "similarity": 0.85,
+        "final_score": 5.35,  // Composite: similarity (0.85) + category boost (3.0) + tag boost (1.5)
+        "match_type": "date+category+tag+semantic",
+        "created_at": "..."
+      }
+    ],
+    "analysis": {
+      "originalQuery": "work tasks from yesterday",
+      "cleanedQuery": "from",
+      "filters": {
+        "datePhrase": "yesterday",
+        "categories": ["work"],
+        "tags": ["tasks"],
+        "exactMatches": {
+          "category": "work",
+          "tags": ["tasks"]
+        }
+      },
+      "searchType": "hybrid"
+    },
+    "metadata": {
+      "dateFiltered": true,
+      "categoryFiltered": true,
+      "tagFiltered": true,
+      "totalMatches": 5
     }
-  ],
-  "query": "ideas about AI and productivity",
-  "count": 15
+  }
 }
 ```
+
+**Score Boosting**:
+- Category exact match: +3.0
+- Tag match: +1.5 per tag
+- Vector similarity: 0.0 to 1.0
+- Final score = similarity + category_boost + tag_boost
+
+**Natural Language Support**:
+- Dates: "yesterday", "this monday", "in 3 days", "Q1 2026"
+- Categories: Automatically detected from query
+- Tags: Automatically detected from query
+- Synonyms: "meetings" → "meeting", "events" → "meeting", "todos" → "task"
+
+**Changed in v2.0** (2026-01-26):
+- Returns `final_score` instead of just `similarity`
+- Added `match_type` field showing what matched
+- Added `analysis` object with query parsing details
+- Added `metadata` object with filter indicators
 
 ---
 

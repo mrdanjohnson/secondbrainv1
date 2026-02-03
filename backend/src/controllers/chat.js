@@ -1,9 +1,9 @@
 import { query } from '../db/index.js';
 import * as vectorService from '../services/vectorService.js';
-import { generateChatResponse, generateEmbedding, classifyAndStructure, getUserSettings } from '../services/aiService.js';
+import { generateChatResponse, classifyAndStructure, getUserSettings } from '../services/aiService.js';
 import { asyncHandler, ApiError } from '../middleware/errorHandler.js';
 import { v4 as uuidv4 } from 'uuid';
-import { parseDateQuery, extractDateFromMessage } from '../utils/dateParser.js';
+import { smartSearch } from '../services/smartSearch.js';
 
 export const chatController = {
   // Send a message and get AI response with context
@@ -160,45 +160,29 @@ export const chatController = {
         similarity: 1.0 // Manual selection = 100% relevant
       }));
     } else {
-      // Auto-search for relevant memories using user's relevancy score setting
+      // Auto-search for relevant memories using smart search
       const chatSettings = await getUserSettings(userId, 'chat');
       const threshold = chatSettings.relevancyScore || 0.3;
       
-      // Detect date-related queries
-      const datePhrase = extractDateFromMessage(message);
-      let dateFilter = null;
+      console.log('[CHAT] Using smart search for context with:', { message, contextLimit, threshold });
       
-      if (datePhrase) {
-        dateFilter = parseDateQuery(datePhrase);
-        console.log('[CHAT] Detected date query:', datePhrase, '→', dateFilter);
-      }
-      
-      console.log('[CHAT] Searching for context with:', { message, contextLimit, threshold, dateFilter });
-      
-      // Generate embedding once and reuse for fallback search
-      const embedding = await generateEmbedding(message);
-      
-      const searchOptions = {
+      const searchResult = await smartSearch(message, {
         limit: parseInt(contextLimit),
+        userId,
         threshold
-      };
+      });
       
-      // Add date filtering if detected
-      if (dateFilter) {
-        searchOptions.dateFrom = dateFilter.startDate;
-        searchOptions.dateTo = dateFilter.endDate;
-        searchOptions.dateField = dateFilter.dateField;
-      }
+      contextMemories = searchResult.results;
       
-      contextMemories = await vectorService.searchMemoriesByVector(embedding, searchOptions);
-      
-      // If no memories meet the threshold, get at least the 1 closest match using same embedding
-      if (contextMemories.length === 0 && !dateFilter) {
-        console.log('[CHAT] No memories met threshold, fetching closest match with same embedding');
-        contextMemories = await vectorService.searchMemoriesByVector(embedding, {
+      // If no memories found and no date filter was active, get at least 1 result
+      if (contextMemories.length === 0 && !searchResult.metadata.dateFiltered) {
+        console.log('[CHAT] No memories met threshold, fetching with threshold=0');
+        const fallbackSearch = await smartSearch(message, {
           limit: 1,
-          threshold: 0 // No threshold, get the closest match
+          userId,
+          threshold: 0
         });
+        contextMemories = fallbackSearch.results;
       }
     }
     console.log('[CHAT] Found', contextMemories.length, 'context memories');

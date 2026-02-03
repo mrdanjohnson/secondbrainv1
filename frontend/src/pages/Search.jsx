@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { searchApi } from '../services/api'
 import MemoryCard from '../components/MemoryCard'
-import { Search, Sparkles, Loader2, Zap, Filter, Calendar, X } from 'lucide-react'
+import { Search, Sparkles, Loader2, Zap, Filter, Calendar, X, Tag, FolderOpen, Clock } from 'lucide-react'
 
 export default function SearchPage() {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
+  const [searchMetadata, setSearchMetadata] = useState(null)
   const [hasSearched, setHasSearched] = useState(false)
   const [dateFilter, setDateFilter] = useState('')
   const [dateField, setDateField] = useState('memory_date')
@@ -20,7 +21,9 @@ export default function SearchPage() {
       dateField: field || 'memory_date'
     }),
     onSuccess: (response) => {
-      setResults(response.data.data.results)
+      const data = response.data.data
+      setResults(data.results || [])
+      setSearchMetadata(data.metadata || null)
       setHasSearched(true)
     }
   })
@@ -218,10 +221,63 @@ export default function SearchPage() {
             {results.length > 0 && (
               <div className="flex items-center gap-2 text-sm text-slate-500">
                 <Filter className="w-4 h-4" />
-                <span>Results ranked by relevance</span>
+                <span>Ranked by relevance</span>
               </div>
             )}
           </div>
+
+          {/* Search Insights */}
+          {searchMetadata && !searchMutation.isPending && (
+            <div className="memory-card bg-gradient-to-r from-primary-50 to-indigo-50 border-primary-200">
+              <div className="flex items-start gap-3">
+                <Sparkles className="w-5 h-5 text-primary-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <h3 className="text-sm font-semibold text-slate-800">Search Intelligence</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {searchMetadata.dateFiltered && (
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-full text-xs font-medium text-slate-700 border border-primary-200">
+                        <Clock className="w-3 h-3 text-primary-600" />
+                        Date filtered
+                      </div>
+                    )}
+                    {searchMetadata.categoryFiltered && (
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-full text-xs font-medium text-slate-700 border border-primary-200">
+                        <FolderOpen className="w-3 h-3 text-primary-600" />
+                        Category match
+                      </div>
+                    )}
+                    {searchMetadata.tagFiltered && (
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-full text-xs font-medium text-slate-700 border border-primary-200">
+                        <Tag className="w-3 h-3 text-primary-600" />
+                        Tag match
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-full text-xs font-medium text-slate-700 border border-primary-200">
+                      <Zap className="w-3 h-3 text-primary-600" />
+                      Vector embeddings
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    {searchMetadata.dateFiltered && searchMetadata.categoryFiltered && searchMetadata.tagFiltered
+                      ? 'Applied date, category, and tag filters with semantic search'
+                      : searchMetadata.dateFiltered && searchMetadata.categoryFiltered
+                      ? 'Applied date and category filters with semantic search'
+                      : searchMetadata.dateFiltered && searchMetadata.tagFiltered
+                      ? 'Applied date and tag filters with semantic search'
+                      : searchMetadata.categoryFiltered && searchMetadata.tagFiltered
+                      ? 'Applied category and tag filters with semantic search'
+                      : searchMetadata.dateFiltered
+                      ? 'Filtered by date range with semantic search'
+                      : searchMetadata.categoryFiltered
+                      ? 'Matched category with semantic search'
+                      : searchMetadata.tagFiltered
+                      ? 'Matched tags with semantic search'
+                      : 'Pure semantic search using AI embeddings'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {searchMutation.isPending ? (
             <div className="flex items-center justify-center py-12">
@@ -243,13 +299,37 @@ export default function SearchPage() {
               {results.map((result) => (
                 <div key={result.id} className="relative">
                   <MemoryCard memory={result} onUpdate={() => {}} />
-                  {result.similarity !== undefined && (
-                    <div className="absolute top-4 right-4">
-                      <span className="text-xs px-2 py-1 bg-primary-100 text-primary-700 rounded-full">
-                        {Math.round(result.similarity * 100)}% match
+                  <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+                    {/* Match Score */}
+                    {result.final_score !== undefined && (
+                      <span className="text-xs px-2.5 py-1 bg-primary-600 text-white rounded-full font-medium shadow-sm">
+                        {Math.round(result.final_score * 100)}% match
                       </span>
+                    )}
+                    {/* Match Type Badges */}
+                    <div className="flex flex-wrap gap-1 justify-end max-w-[200px]">
+                      {result.match_type && result.match_type.includes('date') && (
+                        <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded border border-blue-200">
+                          📅 Date
+                        </span>
+                      )}
+                      {result.match_type && result.match_type.includes('category') && (
+                        <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded border border-green-200">
+                          📁 Category
+                        </span>
+                      )}
+                      {result.match_type && result.match_type.includes('tag') && (
+                        <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded border border-purple-200">
+                          🏷️ Tag
+                        </span>
+                      )}
+                      {result.match_type && result.match_type.includes('semantic') && (
+                        <span className="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded border border-orange-200">
+                          ✨ Semantic
+                        </span>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               ))}
             </div>
