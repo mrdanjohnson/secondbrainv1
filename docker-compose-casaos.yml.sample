@@ -1,0 +1,175 @@
+# Second Brain - CasaOS Docker Compose Configuration (SAMPLE)
+# ============================================================
+# This is a sample configuration file for CasaOS deployment
+# 
+# To use this file:
+#   1. Copy to docker-compose-casaos.yml
+#   2. Update environment variables with your actual values
+#   3. Import into CasaOS
+#
+# Prerequisites:
+#   1. Project copied to: /DATA/Apps/secondbrainv1
+#   2. Configure environment: Copy .env.casaos.example to .env
+#   3. Edit .env with your API keys and passwords
+#   4. Import this file in CasaOS: App Store → Custom Install → Import Compose File
+#
+# CasaOS will automatically run:
+#   docker compose build
+#   docker compose up -d
+#
+# Access URLs (adjust IP to your CasaOS server):
+#   - Frontend: http://YOUR_CASAOS_IP:3100
+#   - Backend API: http://YOUR_CASAOS_IP:3101
+#   - N8N: http://YOUR_CASAOS_IP:5679
+#   - PostgreSQL: YOUR_CASAOS_IP:5433
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database with pgvector
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: secondbrain-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-secondbrain}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secondbrain_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-second_brain}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - /DATA/Apps/secondbrainv1/shared/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5433:5432"
+    networks:
+      - secondbrain-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-secondbrain} -d ${POSTGRES_DB:-second_brain}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # N8N Workflow Automation
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: secondbrain-n8n
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-secondbrain123}
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - N8N_SECURE_COOKIE=false
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-second_brain}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER:-secondbrain}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD:-secondbrain_secret}
+      - GENERIC_TIMEZONE=UTC
+      - TZ=UTC
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5679}
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - /DATA/Apps/secondbrainv1/n8n:/local-n8n:ro
+    ports:
+      - "5679:5678"
+    networks:
+      - secondbrain-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Backend API Server
+  backend:
+    build:
+      context: /DATA/Apps/secondbrainv1/backend
+      dockerfile: Dockerfile
+    container_name: secondbrain-backend
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-secondbrain}:${POSTGRES_PASSWORD:-secondbrain_secret}@postgres:5432/${POSTGRES_DB:-second_brain}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-second_brain}
+      - POSTGRES_USER=${POSTGRES_USER:-secondbrain}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secondbrain_secret}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5679/webhook}
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      - SKIP_DB_SETUP=${SKIP_DB_SETUP:-false}
+      - OLLAMA_API_URL=${OLLAMA_API_URL:-http://ollama:11434}
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-openai}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+    ports:
+      - "3101:3001"
+    networks:
+      - secondbrain-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+
+  # Ollama Local LLM Server (Optional)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: secondbrain-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11435:11434"
+    networks:
+      - secondbrain-net
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  # Frontend Web Application
+  frontend:
+    build:
+      context: /DATA/Apps/secondbrainv1/frontend
+      dockerfile: Dockerfile
+    container_name: secondbrain-frontend
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://YOUR_CASAOS_IP:3101/api}
+    ports:
+      - "3100:80"
+    networks:
+      - secondbrain-net
+    depends_on:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      retries: 3
+
+# Named volumes for data persistence
+volumes:
+  postgres_data:
+    driver: local
+  n8n_data:
+    driver: local
+  ollama_data:
+    driver: local
+
+# Network configuration
+networks:
+  secondbrain-net:
+    driver: bridge

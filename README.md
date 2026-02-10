@@ -138,6 +138,93 @@ The system will automatically:
 4. Generate vector embedding
 5. Store in database
 
+## CasaOS Integration
+I'll create a CasaOS-optimized Docker Compose file with local build contexts and non-conflicting ports. 
+
+Created [](file:///c%3A/Coding/secondbrainv1/docker-compose-casaos.yml)
+
+ 
+
+Created [](file:///c%3A/Coding/secondbrainv1/.env.casaos.example)
+
+ 
+
+Created [](file:///c%3A/Coding/secondbrainv1/CASAOS-DEPLOYMENT.md)
+
+Perfect! I've created a complete CasaOS deployment setup for your Second Brain app. Here's what I created:
+
+## 📦 Created Files
+
+### 1. **docker-compose-casaos.yml**
+   - Optimized for CasaOS with local build contexts
+   - Uses available ports (no conflicts with your existing containers)
+   - All services configured for production
+   - No empty arrays or Swarm syntax
+
+### 2. **.env.casaos.example**
+   - Template for environment configuration
+   - Includes placeholders for all required variables
+   - Security warnings for critical settings
+
+### 3. **CASAOS-DEPLOYMENT.md**
+   - Complete step-by-step deployment guide
+   - Troubleshooting section
+   - Maintenance commands
+   - Security recommendations
+
+## 🔌 Port Assignments (Conflict-Free)
+
+| Service | External Port | Internal Port | Status |
+|---------|--------------|---------------|--------|
+| Frontend | **3100** | 80 | ✅ Available |
+| Backend | **3101** | 3001 | ✅ Available |
+| PostgreSQL | **5433** | 5432 | ✅ Avoids 5432 conflict |
+| N8N | **5679** | 5678 | ✅ Avoids 5678 conflict |
+| Ollama | **11435** | 11434 | ✅ Avoids 11434 conflict |
+
+## 🎯 Key Features
+
+✅ **Local builds** - All services build from `/DATA/Apps/secondbrainv1`  
+✅ **No Docker Hub** - Completely local deployment  
+✅ **CasaOS compatible** - Standard port syntax, no empty arrays  
+✅ **Production ready** - Uses production Dockerfiles  
+✅ **Health checks** - All services monitored  
+✅ **Named volumes** - Data persists across restarts  
+
+## 🚀 Quick Deployment
+
+```bash
+# 1. Copy project to CasaOS
+scp -r secondbrainv1 user@casaos:/DATA/Apps/
+
+# 2. Configure environment
+cd /DATA/Apps/secondbrainv1
+cp .env.casaos.example .env
+nano .env  # Update passwords and API keys
+
+# 3. Import in CasaOS UI
+# CasaOS → App Store → Custom Install → Import Compose File
+# Upload: docker-compose-casaos.yml
+```
+
+## 📝 Don't Forget
+
+1. **Update .env** with your actual:
+   - Database password
+   - N8N password  
+   - OpenAI/Anthropic API key
+   - JWT secret (32+ chars)
+   - Your CasaOS IP address in `VITE_API_URL`
+
+2. **Access URLs** (replace with your IP):
+   - App: `http://192.168.1.XXX:3100`
+   - API: `http://192.168.1.XXX:3101/api`
+   - N8N: `http://192.168.1.XXX:5679`
+
+The deployment guide has complete instructions, troubleshooting, and maintenance commands!
+
+SEE CASAOS-DEPLOYMENT.MD FOR MORE INFO
+
 ## API Documentation
 
 ### Authentication
