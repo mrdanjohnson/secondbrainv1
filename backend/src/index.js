@@ -35,8 +35,8 @@ app.use(cors({
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
-    // Also allow any 192.168.x.x address on port 5173
-    if (origin.match(/^http:\/\/(localhost|192\.168\.\d+\.\d+|127\.0\.0\.1):5173$/)) {
+    // Also allow any 192.168.x.x address on port 5173 (dev) or 3100 (production)
+    if (origin.match(/^http:\/\/(localhost|192\.168\.\d+\.\d+|127\.0\.0\.1):(5173|3100)$/)) {
       return callback(null, true);
     }
     

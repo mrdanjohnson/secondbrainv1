@@ -126,27 +126,26 @@ export async function smartSearch(userQuery, options = {}) {
   // Step 5: Build SQL query with score boosting
   const whereClause = whereClauses.join(' AND ');
 
+  // Build boost expressions conditionally
+  const categoryBoostExpr = categoryParamIndex 
+    ? `CASE WHEN category = $${categoryParamIndex} THEN 3.0 ELSE 0 END`
+    : '0';
+  
+  const tagBoostExpr = tagParamIndex
+    ? `CASE WHEN tags && $${tagParamIndex}::text[] THEN 1.5 ELSE 0 END`
+    : '0';
+
   const sql = `
     SELECT *,
       1 - (embedding <=> $${embedParamIndex}::vector) as similarity,
-      CASE 
-        WHEN category = $${categoryParamIndex || 'NULL'} THEN 3.0 
-        ELSE 0 
-      END as category_boost,
-      CASE 
-        WHEN tags && $${tagParamIndex || 'NULL'}::text[] THEN 
-          1.5 * COALESCE(array_length(
-            ARRAY(SELECT unnest(tags) INTERSECT SELECT unnest($${tagParamIndex || 'NULL'}::text[])), 
-            1
-          ), 0)
-        ELSE 0 
-      END as tag_boost
+      ${categoryBoostExpr} as category_boost,
+      ${tagBoostExpr} as tag_boost
     FROM memories
     WHERE ${whereClause}
     ORDER BY 
       (1 - (embedding <=> $${embedParamIndex}::vector) + 
-       CASE WHEN category = $${categoryParamIndex || 'NULL'} THEN 3.0 ELSE 0 END +
-       CASE WHEN tags && $${tagParamIndex || 'NULL'}::text[] THEN 1.5 ELSE 0 END
+       ${categoryBoostExpr} +
+       ${tagBoostExpr}
       ) DESC
     LIMIT $${limitParamIndex}
   `;

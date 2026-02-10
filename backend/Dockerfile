@@ -30,18 +30,7 @@ ENV PORT=3001
 
 # Health check - includes database connectivity check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-  CMD node -e "
-    const http = require('http');
-    http.get('http://localhost:3001/health', (res) => {
-      process.exit(res.statusCode === 200 ? 0 : 1);
-    }).on('error', () => process.exit(1));
-  " || exit 1
-
-# Entrypoint script for database setup
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
-ENTRYPOINT ["docker-entrypoint.sh"]
+  CMD node -e "const http = require('http'); http.get('http://localhost:3001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));" || exit 1
 
 # Start application
 CMD ["node", "src/index.js"]
